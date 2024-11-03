@@ -1,4 +1,7 @@
+# .gitignore
+
 bin/*
+config.yaml
 
 ### go section
 
