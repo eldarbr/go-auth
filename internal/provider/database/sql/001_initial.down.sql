@@ -1,10 +1,10 @@
 BEGIN;
 
-DROP TABLE user_group;
+DROP TABLE users_groups;
 
-DROP TABLE service;
+DROP TABLE services;
 
-DROP TABLE user;
+DROP TABLE users;
 
 DROP TYPE user_role_type;
 

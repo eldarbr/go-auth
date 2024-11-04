@@ -1,9 +1,11 @@
-package config
+package config_test
 
 import (
 	"io/fs"
 	"os"
 	"testing"
+
+	"github.com/eldarbr/go-auth/internal/service/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,7 +16,9 @@ func TestParseEmptyPath(t *testing.T) {
 		A int    `yaml:"a"`
 		B string `yaml:"b"`
 	}
-	err := ParseConfig("", &testConfStruct)
+
+	err := config.ParseConfig("", &testConfStruct)
+
 	assert.Error(t, err)
 }
 
@@ -23,7 +27,9 @@ func TestParseDirInsteadOfFile(t *testing.T) {
 		A int    `yaml:"a"`
 		B string `yaml:"b"`
 	}
-	err := ParseConfig("cmd", &testConfStruct)
+
+	err := config.ParseConfig("cmd", &testConfStruct)
+
 	assert.Error(t, err)
 }
 
@@ -32,7 +38,9 @@ func TestParseUnexistentFile(t *testing.T) {
 		A int    `yaml:"a"`
 		B string `yaml:"b"`
 	}
-	err := ParseConfig("/unexistent_file", &testConfStruct)
+
+	err := config.ParseConfig("/unexistent_file", &testConfStruct)
+
 	assert.Error(t, err)
 }
 
@@ -52,11 +60,13 @@ s2: lemon stripe
 			S2 string `yaml:"s2"`
 		}
 	)
+
 	err := os.WriteFile(testFilePath, []byte(testFileContent), fs.ModePerm)
 	if err != nil {
 		t.Skip("could not write temporary file")
 	}
-	require.NoError(t, ParseConfig(testFilePath, &testConf))
+
+	require.NoError(t, config.ParseConfig(testFilePath, &testConf))
 	assert.Equal(t, -31, testConf.I1)
 	assert.Equal(t, uint(123), testConf.U1)
 	assert.Equal(t, "Elise", testConf.S1)
@@ -75,17 +85,19 @@ u4: "postgres://postUser:postPassword@1.1.1.1:5432/dbname?sssssss=no"
 s2: skippppp
 `
 		testConf struct {
-			U1 YamlURL `yaml:"u1"`
-			U2 YamlURL `yaml:"u2"`
-			U3 YamlURL `yaml:"u3"`
-			U4 YamlURL `yaml:"u4"`
+			U1 config.YamlURL `yaml:"u1"`
+			U2 config.YamlURL `yaml:"u2"`
+			U3 config.YamlURL `yaml:"u3"`
+			U4 config.YamlURL `yaml:"u4"`
 		}
 	)
+
 	err := os.WriteFile(testFilePath, []byte(testFileContent), fs.ModePerm)
 	if err != nil {
 		t.Skip("could not write temporary file")
 	}
-	require.NoError(t, ParseConfig(testFilePath, &testConf))
+
+	require.NoError(t, config.ParseConfig(testFilePath, &testConf))
 	assert.ElementsMatch(t,
 		[]any{testConf.U1.Scheme, testConf.U2.Scheme, testConf.U3.Scheme, testConf.U4.Scheme},
 		[]any{"http", "https", "https", "postgres"},

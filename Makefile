@@ -1,3 +1,5 @@
+DISABLED_LINTERS="depguard,paralleltest"
+
 all:
 
 build:
@@ -11,7 +13,7 @@ fmt:
 
 lint:
 	go vet ./...
-	golangci-lint run
+	golangci-lint run --enable-all --color=never --disable=$(DISABLED_LINTERS)
 
 coverage:
 	mkdir -p bin
