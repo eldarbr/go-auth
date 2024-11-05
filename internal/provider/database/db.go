@@ -7,19 +7,24 @@ import (
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/pgx/v5"
-
-	// File driver import for .sql migrations.
-	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/golang-migrate/migrate/v4/source/file" // File driver import for .sql migrations.
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var dbPool *pgxpool.Pool
+var (
+	dbPool *pgxpool.Pool
 
-func Setup(ctx context.Context, uri string) error {
+	ErrDBNotInitilized = errors.New("database was not initialized")
+	ErrNilArgument     = errors.New("nil argument received")
+	ErrNoRows          = errors.New("query has returned no rows")
+)
+
+// Setup prepares the connection pool and runs MigrateAuthUp.
+func Setup(ctx context.Context, dbURI, migrationsPath string) error {
 	var err error
 
 	// Connect to the db.
-	dbPool, err = pgxpool.New(ctx, uri)
+	dbPool, err = pgxpool.New(ctx, dbURI)
 	if err != nil {
 		return fmt.Errorf("database.Setup Connection failed: %w", err)
 	}
@@ -29,26 +34,28 @@ func Setup(ctx context.Context, uri string) error {
 	}
 
 	// Migrate the db.
-	err = migrateAuth(uri)
+	err = MigrateAuthUp(dbURI, migrationsPath)
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		ClosePool()
+
 		return fmt.Errorf("database.Setup Migration failed: %w", err)
 	}
 
 	return nil
 }
 
-func migrateAuth(uri string) error {
+func MigrateAuthUp(dbURI, migrationsPath string) error {
 	var err error
 
 	postgres := &pgx.Postgres{}
 
-	dbConn, err := postgres.Open(uri)
+	dbConn, err := postgres.Open(dbURI)
 	if err != nil {
 		return fmt.Errorf("database.migrateAuth Connection failed: %w", err)
 	}
 	defer dbConn.Close()
 
-	migration, err := migrate.NewWithDatabaseInstance("file://./internal/provider/database/sql", "pgx", dbConn)
+	migration, err := migrate.NewWithDatabaseInstance(migrationsPath, "pgx", dbConn)
 	if err != nil {
 		return fmt.Errorf("database.migrateAuth Migration failed: %w", err)
 	}
@@ -63,4 +70,11 @@ func migrateAuth(uri string) error {
 
 func GetPool() *pgxpool.Pool {
 	return dbPool
+}
+
+func ClosePool() {
+	if dbPool != nil {
+		dbPool.Close()
+		dbPool = nil
+	}
 }

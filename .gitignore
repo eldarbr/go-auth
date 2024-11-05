@@ -1,6 +1,6 @@
 # .gitignore
 
-bin/*
+bin/
 config.yaml
 
 ### go section

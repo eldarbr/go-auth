@@ -1,15 +1,18 @@
 package config_test
 
 import (
+	"flag"
 	"io/fs"
 	"os"
 	"testing"
 
-	"github.com/eldarbr/go-auth/internal/service/config"
-
+	"github.com/eldarbr/go-auth/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Must be here because of multipacakge testing of the database.
+var _ = flag.String("t-db-uri", "", "perform sql tests on the `t-db-uri` database")
 
 func TestParseEmptyPath(t *testing.T) {
 	var testConfStruct struct {
