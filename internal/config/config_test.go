@@ -36,7 +36,7 @@ func TestParseDirInsteadOfFile(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestParseUnexistentFile(t *testing.T) {
+func TestParseInexistentFile(t *testing.T) {
 	var testConfStruct struct {
 		A int    `yaml:"a"`
 		B string `yaml:"b"`
@@ -49,12 +49,12 @@ func TestParseUnexistentFile(t *testing.T) {
 
 func TestValidPrimitives(t *testing.T) {
 	var (
-		testFilePath    = "/tmp/go_test_file"
+		testFilePath    = "/tmp/go_test_conf_file"
 		testFileContent = `
 i1: -31
 u1: 123
 s1: Elise
-s2: lemon stripe
+s2: Teo the Lemon Stripe
 `
 		testConf struct {
 			I1 int    `yaml:"i1"`
@@ -73,12 +73,12 @@ s2: lemon stripe
 	assert.Equal(t, -31, testConf.I1)
 	assert.Equal(t, uint(123), testConf.U1)
 	assert.Equal(t, "Elise", testConf.S1)
-	assert.Equal(t, "lemon stripe", testConf.S2)
+	assert.Equal(t, "Teo the Lemon Stripe", testConf.S2)
 }
 
 func TestValidUrls(t *testing.T) {
 	var (
-		testFilePath    = "/tmp/go_test_file"
+		testFilePath    = "/tmp/go_test_conf_file"
 		testFileContent = `
 u1: "http://test@neverssl.com"
 u2: "https://yandex.ru/search/nothing"
@@ -117,4 +117,31 @@ s2: skippppp
 		[]any{testConf.U1.Path, testConf.U2.Path, testConf.U3.Path, testConf.U4.Path},
 		[]any{"", "/search/nothing", "/watch", "/dbname"},
 	)
+}
+
+func TestParseInexistentVars(t *testing.T) {
+	var (
+		testFilePath    = "/tmp/go_test_conf_file"
+		testFileContent = `
+u1: 123
+s1: Elise
+`
+		testConf struct {
+			I1 int    `yaml:"i1"`
+			U1 uint   `yaml:"u1"`
+			S1 string `yaml:"s1"`
+			S2 string `yaml:"s2"`
+		}
+	)
+
+	err := os.WriteFile(testFilePath, []byte(testFileContent), fs.ModePerm)
+	if err != nil {
+		t.Skip("could not write temporary file")
+	}
+
+	require.NoError(t, config.ParseConfig(testFilePath, &testConf))
+	assert.Equal(t, 0, testConf.I1)
+	assert.Equal(t, uint(123), testConf.U1)
+	assert.Equal(t, "Elise", testConf.S1)
+	assert.Equal(t, "", testConf.S2)
 }

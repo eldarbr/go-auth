@@ -14,14 +14,19 @@ import (
 var (
 	dbPool *pgxpool.Pool
 
-	ErrDBNotInitilized = errors.New("database was not initialized")
-	ErrNilArgument     = errors.New("nil argument received")
-	ErrNoRows          = errors.New("query has returned no rows")
+	ErrAlreadyInitialized = errors.New("the database is initialized already")
+	ErrDBNotInitilized    = errors.New("database was not initialized")
+	ErrNilArgument        = errors.New("nil argument received")
+	ErrNoRows             = errors.New("query has returned no rows")
 )
 
 // Setup prepares the connection pool and runs MigrateAuthUp.
 func Setup(ctx context.Context, dbURI, migrationsPath string) error {
 	var err error
+
+	if dbPool != nil {
+		return ErrAlreadyInitialized
+	}
 
 	// Connect to the db.
 	dbPool, err = pgxpool.New(ctx, dbURI)

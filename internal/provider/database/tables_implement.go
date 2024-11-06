@@ -228,6 +228,7 @@ WHERE "name" = $1
 	return nil
 }
 
+// TODO: check if the user_role is adequate.
 func (s implTableUsersGroups) Add(ctx context.Context, database *pgxpool.Pool,
 	userGroup *AddUserGroup) (*UserGroup, error,
 ) {
@@ -270,6 +271,7 @@ RETURNING
 	return &dst, nil
 }
 
+// TODO: check if the user_role is adequate.
 func (s implTableUsersGroups) Insert(ctx context.Context, database *pgxpool.Pool, userGroup *UserGroup) error {
 	if database == nil {
 		return ErrDBNotInitilized
@@ -299,6 +301,7 @@ VALUES
 	return nil
 }
 
+// TODO: check if the user_role is adequate.
 func (s implTableUsersGroups) UpdateByID(ctx context.Context, database *pgxpool.Pool, userGroup *UserGroup,
 	dbEntryID uint) error {
 

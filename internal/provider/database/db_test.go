@@ -35,6 +35,13 @@ func checkDB(t *testing.T) {
 	}
 }
 
+func TestInitializeTwice(t *testing.T) {
+	checkDB(t)
+
+	err := database.Setup(context.Background(), *testDBUri, "")
+	require.ErrorIs(t, err, database.ErrAlreadyInitialized)
+}
+
 func TestNilArguments(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
@@ -532,5 +539,37 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 	for i := range insertedEntries {
 		err := database.TableUsersGroups.DeleteByID(context.Background(), database.GetPool(), insertedEntries[i].ID)
 		require.NoError(t, err)
+	}
+}
+
+func TestUsersGroupsInvalidGetUpdateDelete(t *testing.T) {
+	t.Parallel() // Running all db tests in parallel.
+	checkDB(t)
+
+	usernames := []string{"123", "", "12345678901234567890", "true", "nameuser", "AAAAAAA", "bbbbbBBBBBB",
+		"1234567890123456789012345678901234567890", "nothing to see here"}
+
+	for _, username := range usernames {
+		t.Run(username, func(t *testing.T) {
+			t.Parallel()
+
+			invalidID := uint(len(username) + 99999) //nolint:gosec // no overflow is possible.
+
+			ret1, err := database.TableUsersGroups.GetByUsername(context.Background(), database.GetPool(), username)
+			assert.Empty(t, ret1)
+			require.NoError(t, err)
+
+			ret2, err := database.TableUsersGroups.GetByID(context.Background(), database.GetPool(), invalidID)
+			assert.Nil(t, ret2)
+			require.ErrorIs(t, database.ErrNoRows, err)
+
+			var dummy database.UserGroup
+			dummy.UserRole = database.UserRoleTypeUser
+			err = database.TableUsersGroups.UpdateByID(context.Background(), database.GetPool(), &dummy, invalidID)
+			require.ErrorIs(t, database.ErrNoRows, err)
+
+			err = database.TableUsersGroups.DeleteByID(context.Background(), database.GetPool(), invalidID)
+			require.ErrorIs(t, database.ErrNoRows, err)
+		})
 	}
 }

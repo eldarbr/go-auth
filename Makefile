@@ -1,11 +1,14 @@
 DISABLED_LINTERS="depguard,paralleltest,execinquery,gochecknoglobals"
 
+ERR_NO_DB_URI='WARNING: The database unit tests will be skipped. Please provide a connection uri to complete tests.\n'
+
 all:
 
 build:
 	go build -o bin/ cmd/go-auth/go-auth.go
 
 test:
+	@if [ ! -n "$(TEST_DB_URI)" ]; then echo $(ERR_NO_DB_URI); fi
 	go test ./... -t-db-uri="$(TEST_DB_URI)"
 
 fmt:
