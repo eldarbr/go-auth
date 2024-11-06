@@ -1,0 +1,91 @@
+openapi: 3.0.2
+
+info:
+  title: go-auth
+  description: SSO authn & authz
+  version: 1.0.0
+
+
+tags:
+  - name: auth
+  - name: management
+
+paths:
+  /auth/authenticate:
+    post:
+      tags:
+        - auth
+
+      summary: obtain token
+        
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreds'
+
+      responses:
+        '200':
+          description: authentication is successful, user receives a token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserToken'
+        '400':
+          description: bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: user didn't provide credentials
+        '401':
+          description: the credentials were rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: the credentials were rejected
+        '500':
+          description: internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: internal error
+  
+components:
+  parameters:
+    APIKey:
+      name: api_key
+      in: query
+      required: true
+      description: Ключ доступа к API
+      schema:
+        type: string
+
+  schemas:
+    UserCreds:
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      example:
+        username: username
+        password: password
+    Error:
+      properties:
+        error:
+          type: string
+      example:
+        error: Bad Request
+    UserToken:
+      properties:
+        token:
+          type: string
+      example:
+        token: a valid token

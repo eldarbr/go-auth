@@ -13,14 +13,19 @@ import (
 
 var testDBUri = flag.String("t-db-uri", "", "perform sql tests on the `t-db-uri` database")
 
+var testDB database.Database
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if testDBUri != nil && *testDBUri != "" {
 		// Not checking the error as if there is an error, the tests won't run.
-		_ = database.Setup(context.Background(), *testDBUri, "file://./sql")
+		db, err := database.Setup(context.Background(), *testDBUri, "file://./sql")
+		if err == nil {
+			testDB = *db
+		}
 
-		defer database.ClosePool()
+		defer testDB.ClosePool()
 	}
 
 	m.Run()
@@ -29,31 +34,24 @@ func TestMain(m *testing.M) {
 func checkDB(t *testing.T) {
 	t.Helper()
 
-	pool := database.GetPool()
+	pool := testDB.GetPool()
 	if pool == nil {
 		t.Skip("database was not initialized")
 	}
-}
-
-func TestInitializeTwice(t *testing.T) {
-	checkDB(t)
-
-	err := database.Setup(context.Background(), *testDBUri, "")
-	require.ErrorIs(t, err, database.ErrAlreadyInitialized)
 }
 
 func TestNilArguments(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	require.ErrorIs(t, database.TableUsers.Add(context.Background(), database.GetPool(), nil), database.ErrNilArgument)
-	require.ErrorIs(t, database.TableServices.Add(context.Background(), database.GetPool(), nil),
+	require.ErrorIs(t, database.TableUsers.Add(context.Background(), testDB.GetPool(), nil), database.ErrNilArgument)
+	require.ErrorIs(t, database.TableServices.Add(context.Background(), testDB.GetPool(), nil),
 		database.ErrNilArgument)
 
-	_, err := database.TableUsersGroups.Add(context.Background(), database.GetPool(), nil)
+	_, err := database.TableUsersGroups.Add(context.Background(), testDB.GetPool(), nil)
 
 	require.ErrorIs(t, err, database.ErrNilArgument)
-	require.ErrorIs(t, database.TableUsersGroups.Insert(context.Background(), database.GetPool(), nil),
+	require.ErrorIs(t, database.TableUsersGroups.Insert(context.Background(), testDB.GetPool(), nil),
 		database.ErrNilArgument)
 }
 
@@ -126,12 +124,12 @@ func TestUsersValidAddAndGet(t *testing.T) {
 	}
 
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), database.GetPool(), &user)
+		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
 	}
 
 	for _, user := range users {
-		dbUser, err := database.TableUsers.GetByUsername(context.Background(), database.GetPool(), user.Username)
+		dbUser, err := database.TableUsers.GetByUsername(context.Background(), testDB.GetPool(), user.Username)
 		require.NoError(t, err)
 		require.NotNil(t, dbUser)
 		assert.Equal(t, user.Username, dbUser.Username)
@@ -160,7 +158,7 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Add.
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), database.GetPool(), &user)
+		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
 	}
 
@@ -181,13 +179,13 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Update.
 	for i := range users {
-		err := database.TableUsers.Update(context.Background(), database.GetPool(), &newUsers[i], users[i].Username)
+		err := database.TableUsers.Update(context.Background(), testDB.GetPool(), &newUsers[i], users[i].Username)
 		require.NoError(t, err)
 	}
 
 	// Assert.
 	for i := range users {
-		dbUser, err := database.TableUsers.GetByUsername(context.Background(), database.GetPool(), newUsers[i].Username)
+		dbUser, err := database.TableUsers.GetByUsername(context.Background(), testDB.GetPool(), newUsers[i].Username)
 		require.NoError(t, err)
 		require.NotNil(t, dbUser)
 		assert.Equal(t, newUsers[i].Username, dbUser.Username)
@@ -196,7 +194,7 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Delete.
 	for i := range newUsers {
-		err := database.TableUsers.Delete(context.Background(), database.GetPool(), newUsers[i].Username)
+		err := database.TableUsers.Delete(context.Background(), testDB.GetPool(), newUsers[i].Username)
 		require.NoError(t, err)
 	}
 }
@@ -213,15 +211,15 @@ func TestUsersInvalidGetUpdateDelete(t *testing.T) {
 		t.Run(username, func(t *testing.T) {
 			t.Parallel()
 
-			ret, err := database.TableUsers.GetByUsername(context.Background(), database.GetPool(), username)
+			ret, err := database.TableUsers.GetByUsername(context.Background(), testDB.GetPool(), username)
 			assert.Nil(t, ret)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
 			var dummy database.User
-			err = database.TableUsers.Update(context.Background(), database.GetPool(), &dummy, username)
+			err = database.TableUsers.Update(context.Background(), testDB.GetPool(), &dummy, username)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
-			err = database.TableUsers.Delete(context.Background(), database.GetPool(), username)
+			err = database.TableUsers.Delete(context.Background(), testDB.GetPool(), username)
 			require.ErrorIs(t, database.ErrNoRows, err)
 		})
 	}
@@ -244,12 +242,12 @@ func TestServicesValidAddAndGet(t *testing.T) {
 	}
 
 	for _, service := range services {
-		err := database.TableServices.Add(context.Background(), database.GetPool(), &service)
+		err := database.TableServices.Add(context.Background(), testDB.GetPool(), &service)
 		require.NoError(t, err)
 	}
 
 	for _, service := range services {
-		dbService, err := database.TableServices.GetByServiceName(context.Background(), database.GetPool(), service.Name)
+		dbService, err := database.TableServices.GetByServiceName(context.Background(), testDB.GetPool(), service.Name)
 		require.NoError(t, err)
 		require.NotNil(t, dbService)
 		assert.Equal(t, service.Name, dbService.Name)
@@ -274,7 +272,7 @@ func TestServicesValidUpdateAndDelete(t *testing.T) {
 
 	// Add.
 	for _, service := range services {
-		err := database.TableServices.Add(context.Background(), database.GetPool(), &service)
+		err := database.TableServices.Add(context.Background(), testDB.GetPool(), &service)
 		require.NoError(t, err)
 	}
 
@@ -292,13 +290,13 @@ func TestServicesValidUpdateAndDelete(t *testing.T) {
 
 	// Update.
 	for i := range services {
-		err := database.TableServices.Update(context.Background(), database.GetPool(), &newServices[i], services[i].Name)
+		err := database.TableServices.Update(context.Background(), testDB.GetPool(), &newServices[i], services[i].Name)
 		require.NoError(t, err)
 	}
 
 	// Assert.
 	for i := range services {
-		dbSerbice, err := database.TableServices.GetByServiceName(context.Background(), database.GetPool(),
+		dbSerbice, err := database.TableServices.GetByServiceName(context.Background(), testDB.GetPool(),
 			newServices[i].Name)
 		require.NoError(t, err)
 		require.NotNil(t, dbSerbice)
@@ -307,7 +305,7 @@ func TestServicesValidUpdateAndDelete(t *testing.T) {
 
 	// Delete.
 	for i := range newServices {
-		err := database.TableServices.Delete(context.Background(), database.GetPool(), newServices[i].Name)
+		err := database.TableServices.Delete(context.Background(), testDB.GetPool(), newServices[i].Name)
 		require.NoError(t, err)
 	}
 }
@@ -324,15 +322,15 @@ func TestServicesInvalidGetUpdateDelete(t *testing.T) {
 		t.Run(serviceName, func(t *testing.T) {
 			t.Parallel()
 
-			ret, err := database.TableServices.GetByServiceName(context.Background(), database.GetPool(), serviceName)
+			ret, err := database.TableServices.GetByServiceName(context.Background(), testDB.GetPool(), serviceName)
 			assert.Nil(t, ret)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
 			var dummy database.Service
-			err = database.TableServices.Update(context.Background(), database.GetPool(), &dummy, serviceName)
+			err = database.TableServices.Update(context.Background(), testDB.GetPool(), &dummy, serviceName)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
-			err = database.TableServices.Delete(context.Background(), database.GetPool(), serviceName)
+			err = database.TableServices.Delete(context.Background(), testDB.GetPool(), serviceName)
 			require.ErrorIs(t, database.ErrNoRows, err)
 		})
 	}
@@ -372,7 +370,7 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 	listInsertedEntries := make([]database.UserGroup, 0, len(usersGroups))
 
 	for _, userGroup := range usersGroups {
-		dbUserGroup, err := database.TableUsersGroups.Add(context.Background(), database.GetPool(), &userGroup)
+		dbUserGroup, err := database.TableUsersGroups.Add(context.Background(), testDB.GetPool(), &userGroup)
 		require.NoError(t, err)
 		require.NotNil(t, dbUserGroup)
 		assert.Equal(t, userGroup.Username, dbUserGroup.Username)
@@ -387,7 +385,7 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 	}
 
 	for _, userGroup := range usersGroups {
-		dbUserGroups, err := database.TableUsersGroups.GetByUsername(context.Background(), database.GetPool(),
+		dbUserGroups, err := database.TableUsersGroups.GetByUsername(context.Background(), testDB.GetPool(),
 			userGroup.Username)
 		require.NoError(t, err)
 		require.NotNil(t, dbUserGroups)
@@ -410,7 +408,7 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 	}
 
 	for _, inserted := range listInsertedEntries {
-		dbEntry, err := database.TableUsersGroups.GetByID(context.Background(), database.GetPool(), inserted.ID)
+		dbEntry, err := database.TableUsersGroups.GetByID(context.Background(), testDB.GetPool(), inserted.ID)
 		require.NoError(t, err)
 		require.NotNil(t, dbEntry)
 
@@ -439,7 +437,7 @@ func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) {
 	}
 
 	for _, service := range services {
-		err := database.TableServices.Add(context.Background(), database.GetPool(), &service)
+		err := database.TableServices.Add(context.Background(), testDB.GetPool(), &service)
 		require.NoError(t, err)
 	}
 
@@ -459,7 +457,7 @@ func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) {
 	}
 
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), database.GetPool(), &user)
+		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
 	}
 }
@@ -499,7 +497,7 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 
 	// Add.
 	for _, userGroup := range usersGroups {
-		ins, err := database.TableUsersGroups.Add(context.Background(), database.GetPool(), &userGroup)
+		ins, err := database.TableUsersGroups.Add(context.Background(), testDB.GetPool(), &userGroup)
 		require.NoError(t, err)
 		require.NotNil(t, ins)
 
@@ -518,14 +516,14 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 
 	// Update.
 	for i := range insertedEntries {
-		err := database.TableUsersGroups.UpdateByID(context.Background(), database.GetPool(),
+		err := database.TableUsersGroups.UpdateByID(context.Background(), testDB.GetPool(),
 			&insertedEntries[i], insertedIDs[i])
 		require.NoError(t, err)
 	}
 
 	// Assert.
 	for _, inserted := range insertedEntries {
-		dbEntry, err := database.TableUsersGroups.GetByID(context.Background(), database.GetPool(), inserted.ID)
+		dbEntry, err := database.TableUsersGroups.GetByID(context.Background(), testDB.GetPool(), inserted.ID)
 		require.NoError(t, err)
 		require.NotNil(t, dbEntry)
 
@@ -537,7 +535,7 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 
 	// Delete.
 	for i := range insertedEntries {
-		err := database.TableUsersGroups.DeleteByID(context.Background(), database.GetPool(), insertedEntries[i].ID)
+		err := database.TableUsersGroups.DeleteByID(context.Background(), testDB.GetPool(), insertedEntries[i].ID)
 		require.NoError(t, err)
 	}
 }
@@ -555,20 +553,20 @@ func TestUsersGroupsInvalidGetUpdateDelete(t *testing.T) {
 
 			invalidID := uint(len(username) + 99999) //nolint:gosec // no overflow is possible.
 
-			ret1, err := database.TableUsersGroups.GetByUsername(context.Background(), database.GetPool(), username)
+			ret1, err := database.TableUsersGroups.GetByUsername(context.Background(), testDB.GetPool(), username)
 			assert.Empty(t, ret1)
 			require.NoError(t, err)
 
-			ret2, err := database.TableUsersGroups.GetByID(context.Background(), database.GetPool(), invalidID)
+			ret2, err := database.TableUsersGroups.GetByID(context.Background(), testDB.GetPool(), invalidID)
 			assert.Nil(t, ret2)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
 			var dummy database.UserGroup
 			dummy.UserRole = database.UserRoleTypeUser
-			err = database.TableUsersGroups.UpdateByID(context.Background(), database.GetPool(), &dummy, invalidID)
+			err = database.TableUsersGroups.UpdateByID(context.Background(), testDB.GetPool(), &dummy, invalidID)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
-			err = database.TableUsersGroups.DeleteByID(context.Background(), database.GetPool(), invalidID)
+			err = database.TableUsersGroups.DeleteByID(context.Background(), testDB.GetPool(), invalidID)
 			require.ErrorIs(t, database.ErrNoRows, err)
 		})
 	}

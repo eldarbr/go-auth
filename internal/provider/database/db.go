@@ -12,41 +12,42 @@ import (
 )
 
 var (
-	dbPool *pgxpool.Pool
-
 	ErrAlreadyInitialized = errors.New("the database is initialized already")
 	ErrDBNotInitilized    = errors.New("database was not initialized")
 	ErrNilArgument        = errors.New("nil argument received")
 	ErrNoRows             = errors.New("query has returned no rows")
 )
 
+type Database struct {
+	dbPool *pgxpool.Pool
+}
+
 // Setup prepares the connection pool and runs MigrateAuthUp.
-func Setup(ctx context.Context, dbURI, migrationsPath string) error {
+func Setup(ctx context.Context, dbURI, migrationsPath string) (*Database, error) {
 	var err error
 
-	if dbPool != nil {
-		return ErrAlreadyInitialized
-	}
-
 	// Connect to the db.
-	dbPool, err = pgxpool.New(ctx, dbURI)
+	dbPool, err := pgxpool.New(ctx, dbURI)
 	if err != nil {
-		return fmt.Errorf("database.Setup Connection failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Connection failed: %w", err)
 	}
 
 	if err = dbPool.Ping(ctx); err != nil {
-		return fmt.Errorf("database.Setup Ping failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Ping failed: %w", err)
 	}
+
+	dbInstancePtr := new(Database)
+	dbInstancePtr.dbPool = dbPool
 
 	// Migrate the db.
 	err = MigrateAuthUp(dbURI, migrationsPath)
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		ClosePool()
+		dbInstancePtr.ClosePool()
 
-		return fmt.Errorf("database.Setup Migration failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Migration failed: %w", err)
 	}
 
-	return nil
+	return dbInstancePtr, nil
 }
 
 func MigrateAuthUp(dbURI, migrationsPath string) error {
@@ -73,13 +74,13 @@ func MigrateAuthUp(dbURI, migrationsPath string) error {
 	return nil
 }
 
-func GetPool() *pgxpool.Pool {
-	return dbPool
+func (db *Database) GetPool() *pgxpool.Pool {
+	return db.dbPool
 }
 
-func ClosePool() {
-	if dbPool != nil {
-		dbPool.Close()
-		dbPool = nil
+func (db *Database) ClosePool() {
+	if db.dbPool != nil {
+		db.dbPool.Close()
+		db.dbPool = nil
 	}
 }
