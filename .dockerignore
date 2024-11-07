@@ -1,0 +1,6 @@
+# .dockerignore
+
+.git/
+bin/
+*_test.go
+config.yaml
