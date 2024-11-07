@@ -13,7 +13,7 @@ import (
 
 var testDBUri = flag.String("t-db-uri", "", "perform sql tests on the `t-db-uri` database")
 
-var testDB database.Database
+var testDB *database.Database
 
 func TestMain(m *testing.M) {
 	flag.Parse()

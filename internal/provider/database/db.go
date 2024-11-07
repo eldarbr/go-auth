@@ -18,44 +18,39 @@ var (
 	ErrNoRows             = errors.New("query has returned no rows")
 )
 
+// Database object should be passed from the owner to users via reference, so after the owner closes
+// the pool, the users might see the change.
 type Database struct {
 	dbPool *pgxpool.Pool
 }
 
-func Setup(ctx context.Context, dbURI, migrationsPath string) (Database, error) {
-	var dbInstance Database
-	return dbInstance, setup(ctx, dbURI, migrationsPath, &dbInstance)
-}
-
 // Setup prepares the connection pool and runs MigrateAuthUp.
-func setup(ctx context.Context, dbURI, migrationsPath string, dbInstancePtr *Database) error {
+func Setup(ctx context.Context, dbURI, migrationsPath string) (*Database, error) {
 	var err error
-
-	if dbInstancePtr == nil {
-		return ErrNilArgument
-	}
 
 	// Connect to the db.
 	dbPool, err := pgxpool.New(ctx, dbURI)
 	if err != nil {
-		return fmt.Errorf("database.Setup Connection failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Connection failed: %w", err)
 	}
 
 	if err = dbPool.Ping(ctx); err != nil {
-		return fmt.Errorf("database.Setup Ping failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Ping failed: %w", err)
 	}
 
-	dbInstancePtr.dbPool = dbPool
+	dbInstancePtr := &Database{
+		dbPool: dbPool,
+	}
 
 	// Migrate the db.
 	err = MigrateAuthUp(dbURI, migrationsPath)
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		dbInstancePtr.ClosePool()
 
-		return fmt.Errorf("database.Setup Migration failed: %w", err)
+		return nil, fmt.Errorf("database.Setup Migration failed: %w", err)
 	}
 
-	return nil
+	return dbInstancePtr, nil
 }
 
 func MigrateAuthUp(dbURI, migrationsPath string) error {
@@ -82,11 +77,19 @@ func MigrateAuthUp(dbURI, migrationsPath string) error {
 	return nil
 }
 
-func (db Database) GetPool() *pgxpool.Pool {
+func (db *Database) GetPool() *pgxpool.Pool {
+	if db == nil {
+		return nil
+	}
+
 	return db.dbPool
 }
 
 func (db *Database) ClosePool() {
+	if db == nil {
+		return
+	}
+
 	if db.dbPool != nil {
 		db.dbPool.Close()
 		db.dbPool = nil

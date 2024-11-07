@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+//nolint:gochecknoinits // Set default implementations.
 func init() {
 	TableUsers = implTableUsers{}
 	TableServices = implTableServices{}
