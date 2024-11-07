@@ -37,10 +37,10 @@ type AddUserGroup struct {
 }
 
 type UserGroup struct {
-	AddUserGroup
-
 	ID        uint
 	CreatedTS time.Time
+
+	AddUserGroup
 }
 
 var TableUsers interface {

@@ -22,21 +22,29 @@ type Database struct {
 	dbPool *pgxpool.Pool
 }
 
+func Setup(ctx context.Context, dbURI, migrationsPath string) (Database, error) {
+	var dbInstance Database
+	return dbInstance, setup(ctx, dbURI, migrationsPath, &dbInstance)
+}
+
 // Setup prepares the connection pool and runs MigrateAuthUp.
-func Setup(ctx context.Context, dbURI, migrationsPath string) (*Database, error) {
+func setup(ctx context.Context, dbURI, migrationsPath string, dbInstancePtr *Database) error {
 	var err error
+
+	if dbInstancePtr == nil {
+		return ErrNilArgument
+	}
 
 	// Connect to the db.
 	dbPool, err := pgxpool.New(ctx, dbURI)
 	if err != nil {
-		return nil, fmt.Errorf("database.Setup Connection failed: %w", err)
+		return fmt.Errorf("database.Setup Connection failed: %w", err)
 	}
 
 	if err = dbPool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("database.Setup Ping failed: %w", err)
+		return fmt.Errorf("database.Setup Ping failed: %w", err)
 	}
 
-	dbInstancePtr := new(Database)
 	dbInstancePtr.dbPool = dbPool
 
 	// Migrate the db.
@@ -44,10 +52,10 @@ func Setup(ctx context.Context, dbURI, migrationsPath string) (*Database, error)
 	if err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		dbInstancePtr.ClosePool()
 
-		return nil, fmt.Errorf("database.Setup Migration failed: %w", err)
+		return fmt.Errorf("database.Setup Migration failed: %w", err)
 	}
 
-	return dbInstancePtr, nil
+	return nil
 }
 
 func MigrateAuthUp(dbURI, migrationsPath string) error {
@@ -74,7 +82,7 @@ func MigrateAuthUp(dbURI, migrationsPath string) error {
 	return nil
 }
 
-func (db *Database) GetPool() *pgxpool.Pool {
+func (db Database) GetPool() *pgxpool.Pool {
 	return db.dbPool
 }
 

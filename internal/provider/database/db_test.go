@@ -20,10 +20,7 @@ func TestMain(m *testing.M) {
 
 	if testDBUri != nil && *testDBUri != "" {
 		// Not checking the error as if there is an error, the tests won't run.
-		db, err := database.Setup(context.Background(), *testDBUri, "file://./sql")
-		if err == nil {
-			testDB = *db
-		}
+		testDB, _ = database.Setup(context.Background(), *testDBUri, "file://./sql")
 
 		defer testDB.ClosePool()
 	}
