@@ -18,12 +18,15 @@ var conf struct {
 	ServingURI       string `yaml:"servingUri"`
 	PrivatePemPath   string `yaml:"privatePemPath"`
 	PublicPemPath    string `yaml:"publicPemPath"`
+	SslCertfilePath  string `yaml:"sslCertfilePath"`
+	SslKeyfilePath   string `yaml:"sslKeyfilePath"`
+	EnableTLSServing bool   `yaml:"enableTlsServing"`
 }
 
 func main() {
 	programContext := context.Background()
 
-	err := config.ParseConfig("config.yaml", &conf)
+	err := config.ParseConfig("secret/config.yaml", &conf)
 	if err != nil {
 		log.Println(err)
 
@@ -54,7 +57,12 @@ func main() {
 		serv = server.NewServer(conf.ServingURI, router)
 	}
 
-	err = serv.ListenAndServe()
+	if conf.EnableTLSServing {
+		err = serv.ListenAndServeTLS(conf.SslCertfilePath, conf.SslKeyfilePath)
+	} else {
+		err = serv.ListenAndServe()
+	}
+
 	if err != nil {
 		log.Println(err)
 	}

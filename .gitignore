@@ -1,6 +1,7 @@
 # .gitignore
 
 bin/
+secret/
 config.yaml
 
 ### go section

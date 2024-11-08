@@ -3,4 +3,5 @@
 .git/
 bin/
 *_test.go
+secret/
 config.yaml
