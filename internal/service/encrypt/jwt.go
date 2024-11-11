@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/eldarbr/go-auth/internal/service/myerrors"
 	"github.com/golang-jwt/jwt"
@@ -18,16 +19,17 @@ var (
 type JWTService struct {
 	privateKey *rsa.PrivateKey
 	publicKey  *rsa.PublicKey
+	tokenTTL   time.Duration
 }
 
-type ClaimUserGroupRole struct {
+type ClaimUserRole struct {
 	ServiceName string `json:"serviceName"`
 	UserRole    string `json:"userRole"`
 }
 
 type AuthCustomClaims struct {
-	Username string               `json:"username"`
-	Groups   []ClaimUserGroupRole `json:"groups"`
+	Username string          `json:"username"`
+	Roles    []ClaimUserRole `json:"roles"`
 }
 
 type myCompletelaims struct {
@@ -35,7 +37,7 @@ type myCompletelaims struct {
 	AuthCustomClaims
 }
 
-func NewJWTService(privatePath, publicPath string) (*JWTService, error) {
+func NewJWTService(privatePath, publicPath string, tokenTTL time.Duration) (*JWTService, error) {
 	privateKeyBytes, err := os.ReadFile(privatePath)
 	if err != nil {
 		return nil, fmt.Errorf("NewJWTService private key read failed: %w", err)
@@ -59,6 +61,7 @@ func NewJWTService(privatePath, publicPath string) (*JWTService, error) {
 	return &JWTService{
 		privateKey: privateKey,
 		publicKey:  publicKey,
+		tokenTTL:   tokenTTL,
 	}, nil
 }
 
@@ -70,7 +73,8 @@ func (jwtService *JWTService) IssueToken(claims AuthCustomClaims) (string, error
 	completeClaims := myCompletelaims{
 		AuthCustomClaims: claims,
 		StandardClaims: jwt.StandardClaims{ //nolint:exhaustruct // other fields are not used.
-			IssuedAt: jwt.TimeFunc().Unix(),
+			IssuedAt:  jwt.TimeFunc().Unix(),
+			ExpiresAt: jwt.TimeFunc().Add(jwtService.tokenTTL).Unix(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS512, completeClaims)
@@ -106,10 +110,18 @@ func (jwtService *JWTService) ValidateToken(tokenString string) (*AuthCustomClai
 	return &claims.AuthCustomClaims, nil
 }
 
-func (claims AuthCustomClaims) Contain(requested ClaimUserGroupRole) bool {
-	for _, claim := range claims.Groups {
-		if (claim.ServiceName == requested.ServiceName || requested.ServiceName == "") &&
-			(claim.UserRole == requested.UserRole || requested.UserRole == "") {
+func (claims AuthCustomClaims) ContainAny(requested []ClaimUserRole) bool {
+	claimsMap := make(map[string]string, len(claims.Roles))
+	for _, role := range claims.Roles {
+		claimsMap[role.ServiceName] = role.UserRole
+	}
+
+	for _, requestedClaim := range requested {
+		if requestedClaim.ServiceName == "" || requestedClaim.UserRole == "" {
+			continue
+		}
+
+		if role, ok := claimsMap[requestedClaim.ServiceName]; ok && (role == requestedClaim.UserRole) {
 			return true
 		}
 	}

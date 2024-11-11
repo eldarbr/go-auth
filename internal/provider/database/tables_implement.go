@@ -4,18 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type implTableUsers struct{}
 
 type implTableServices struct{}
 
-type implTableUsersGroups struct{}
+type implTableUsersRoles struct{}
 
-func (s implTableUsers) Add(ctx context.Context, database *pgxpool.Pool, user *User) error {
+func (s implTableUsers) Add(ctx context.Context, database Querier, user *User) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
@@ -33,6 +33,10 @@ VALUES
 	`
 
 	_, err := database.Exec(ctx, query, user.Username, user.Password)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableUsers.Add failed on INSERT INTO: %w", err)
 	}
@@ -40,7 +44,7 @@ VALUES
 	return nil
 }
 
-func (s implTableUsers) Update(ctx context.Context, database *pgxpool.Pool, user *User, username string) error {
+func (s implTableUsers) Update(ctx context.Context, database Querier, user *User, username string) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
@@ -58,6 +62,10 @@ WHERE "username" = $3
 	`
 
 	result, err := database.Exec(ctx, query, user.Username, user.Password, username)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableUsers.Update failed on UPDATE: %w", err)
 	}
@@ -69,7 +77,7 @@ WHERE "username" = $3
 	return nil
 }
 
-func (s implTableUsers) GetByUsername(ctx context.Context, database *pgxpool.Pool, username string) (*User, error) {
+func (s implTableUsers) GetByUsername(ctx context.Context, database Querier, username string) (*User, error) {
 	if database == nil {
 		return nil, ErrDBNotInitilized
 	}
@@ -98,7 +106,7 @@ WHERE "username" = $1
 	return &dst, nil
 }
 
-func (s implTableUsers) Delete(ctx context.Context, database *pgxpool.Pool, username string) error {
+func (s implTableUsers) Delete(ctx context.Context, database Querier, username string) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
@@ -120,7 +128,7 @@ WHERE "username" = $1
 	return nil
 }
 
-func (s implTableServices) Add(ctx context.Context, database *pgxpool.Pool, service *Service) error {
+func (s implTableServices) Add(ctx context.Context, database Querier, service *Service) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
@@ -137,6 +145,10 @@ VALUES
 	`
 
 	_, err := database.Exec(ctx, query, service.Name)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableServices.Add failed on INSERT: %w", err)
 	}
@@ -144,7 +156,7 @@ VALUES
 	return nil
 }
 
-func (s implTableServices) Update(ctx context.Context, database *pgxpool.Pool, service *Service,
+func (s implTableServices) Update(ctx context.Context, database Querier, service *Service,
 	serviceName string) error {
 
 	if database == nil {
@@ -163,6 +175,10 @@ WHERE "name" = $2
 	`
 
 	result, err := database.Exec(ctx, query, service.Name, serviceName)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableServices.Update failed on UPDATE: %w", err)
 	}
@@ -174,7 +190,7 @@ WHERE "name" = $2
 	return nil
 }
 
-func (s implTableServices) GetByServiceName(ctx context.Context, database *pgxpool.Pool,
+func (s implTableServices) GetByServiceName(ctx context.Context, database Querier,
 	serviceName string) (*Service, error,
 ) {
 	if database == nil {
@@ -204,7 +220,7 @@ WHERE "name" = $1
 	return &dst, nil
 }
 
-func (s implTableServices) Delete(ctx context.Context, database *pgxpool.Pool,
+func (s implTableServices) Delete(ctx context.Context, database Querier,
 	serviceName string) error {
 
 	if database == nil {
@@ -229,19 +245,19 @@ WHERE "name" = $1
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersGroups) Add(ctx context.Context, database *pgxpool.Pool,
-	userGroup *AddUserGroup) (*UserGroup, error,
+func (s implTableUsersRoles) Add(ctx context.Context, database Querier,
+	userRole *AddUserRole) (*UserRole, error,
 ) {
 	if database == nil {
 		return nil, ErrDBNotInitilized
 	}
 
-	if userGroup == nil {
+	if userRole == nil {
 		return nil, ErrNilArgument
 	}
 
 	query := `
-INSERT INTO "users_groups"
+INSERT INTO "users_roles"
   ("username",
   "user_role",
   "service_name")
@@ -255,10 +271,14 @@ RETURNING
   "created_ts"
 	`
 
-	var dst UserGroup
+	var dst UserRole
 
-	queryResult := database.QueryRow(ctx, query, userGroup.Username, userGroup.UserRole, userGroup.ServiceName)
+	queryResult := database.QueryRow(ctx, query, userRole.Username, userRole.UserRole, userRole.ServiceName)
 	err := queryResult.Scan(&dst.ID, &dst.Username, &dst.UserRole, &dst.ServiceName, &dst.CreatedTS)
+
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return nil, ErrUniqueKeyViolation
+	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNoRows
@@ -272,17 +292,17 @@ RETURNING
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersGroups) Insert(ctx context.Context, database *pgxpool.Pool, userGroup *UserGroup) error {
+func (s implTableUsersRoles) Insert(ctx context.Context, database Querier, userRole *UserRole) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
 
-	if userGroup == nil {
+	if userRole == nil {
 		return ErrNilArgument
 	}
 
 	query := `
-INSERT INTO "users_groups"
+INSERT INTO "users_roles"
   ("id",
   "username",
   "user_role",
@@ -292,8 +312,12 @@ VALUES
 	($1, $2, $3, $4, $5)
 	`
 
-	_, err := database.Exec(ctx, query, userGroup.ID, userGroup.Username, userGroup.UserRole,
-		userGroup.ServiceName, userGroup.CreatedTS)
+	_, err := database.Exec(ctx, query, userRole.ID, userRole.Username, userRole.UserRole,
+		userRole.ServiceName, userRole.CreatedTS)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableUsersGroups.Insert failed on INSERT: %w", err)
 	}
@@ -302,19 +326,19 @@ VALUES
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersGroups) UpdateByID(ctx context.Context, database *pgxpool.Pool, userGroup *UserGroup,
+func (s implTableUsersRoles) UpdateByID(ctx context.Context, database Querier, userRole *UserRole,
 	dbEntryID uint) error {
 
 	if database == nil {
 		return ErrDBNotInitilized
 	}
 
-	if userGroup == nil {
+	if userRole == nil {
 		return ErrNilArgument
 	}
 
 	query := `
-UPDATE "users_groups"
+UPDATE "users_roles"
 SET
   "id" = $1,
   "username" = $2,
@@ -324,8 +348,12 @@ SET
 WHERE "id" = $6
 	`
 
-	result, err := database.Exec(ctx, query, userGroup.ID, userGroup.Username, userGroup.UserRole,
-		userGroup.ServiceName, userGroup.CreatedTS, dbEntryID)
+	result, err := database.Exec(ctx, query, userRole.ID, userRole.Username, userRole.UserRole,
+		userRole.ServiceName, userRole.CreatedTS, dbEntryID)
+	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrUniqueKeyViolation
+	}
+
 	if err != nil {
 		return fmt.Errorf("TableUsersGroups.UpdateByID failed on UPDATE: %w", err)
 	}
@@ -337,8 +365,8 @@ WHERE "id" = $6
 	return nil
 }
 
-func (s implTableUsersGroups) GetByUsername(ctx context.Context, database *pgxpool.Pool,
-	username string) ([]UserGroup, error,
+func (s implTableUsersRoles) GetByUsername(ctx context.Context, database Querier,
+	username string) ([]UserRole, error,
 ) {
 	if database == nil {
 		return nil, ErrDBNotInitilized
@@ -351,12 +379,12 @@ SELECT
   "user_role",
   "service_name",
   "created_ts"
-FROM "users_groups"
+FROM "users_roles"
 WHERE "username" = $1
 	`
 
 	var (
-		dst []UserGroup
+		dst []UserRole
 		err error
 	)
 
@@ -365,8 +393,8 @@ WHERE "username" = $1
 		return nil, fmt.Errorf("TableUsersGroups.GetByUsername failed on SELECT: %w", err)
 	}
 
-	dst, err = pgx.CollectRows(queryResult, func(row pgx.CollectableRow) (UserGroup, error) {
-		var nextDst UserGroup
+	dst, err = pgx.CollectRows(queryResult, func(row pgx.CollectableRow) (UserRole, error) {
+		var nextDst UserRole
 		err = row.Scan(&nextDst.ID, &nextDst.Username, &nextDst.UserRole, &nextDst.ServiceName, &nextDst.CreatedTS)
 
 		return nextDst, err //nolint:wrapcheck // not an actual return
@@ -378,7 +406,7 @@ WHERE "username" = $1
 	return dst, nil
 }
 
-func (s implTableUsersGroups) GetByID(ctx context.Context, database *pgxpool.Pool, dbEntryID uint) (*UserGroup, error) {
+func (s implTableUsersRoles) GetByID(ctx context.Context, database Querier, dbEntryID uint) (*UserRole, error) {
 	if database == nil {
 		return nil, ErrDBNotInitilized
 	}
@@ -390,11 +418,11 @@ SELECT
   "user_role",
   "service_name",
   "created_ts"
-FROM "users_groups"
+FROM "users_roles"
 WHERE "id" = $1
 		`
 
-	var dst UserGroup
+	var dst UserRole
 
 	queryResult := database.QueryRow(ctx, query, dbEntryID)
 	err := queryResult.Scan(&dst.ID, &dst.Username, &dst.UserRole, &dst.ServiceName, &dst.CreatedTS)
@@ -410,13 +438,13 @@ WHERE "id" = $1
 	return &dst, nil
 }
 
-func (s implTableUsersGroups) DeleteByID(ctx context.Context, database *pgxpool.Pool, dbEntryID uint) error {
+func (s implTableUsersRoles) DeleteByID(ctx context.Context, database Querier, dbEntryID uint) error {
 	if database == nil {
 		return ErrDBNotInitilized
 	}
 
 	query := `
-DELETE FROM "users_groups"
+DELETE FROM "users_roles"
 WHERE "id" = $1
 		`
 

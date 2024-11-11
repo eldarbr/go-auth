@@ -2,8 +2,12 @@ package model
 
 import "github.com/eldarbr/go-auth/internal/service/encrypt"
 
-type UserCreds struct {
+type UserUsernme struct {
 	Username string `json:"username"`
+}
+
+type UserCreds struct {
+	UserUsernme
 	Password string `json:"password"`
 }
 

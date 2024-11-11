@@ -8,7 +8,7 @@ import (
 )
 
 func writeJSONResponse(responseWriter http.ResponseWriter, response any, code int) {
-	responseWriter.Header().Set("content-type", "application/json")
+	responseWriter.Header().Set("Content-Type", "application/json")
 
 	resp, marshalErr := json.Marshal(response)
 	if marshalErr != nil {

@@ -16,6 +16,7 @@ var (
 	ErrDBNotInitilized    = errors.New("database was not initialized")
 	ErrNilArgument        = errors.New("nil argument received")
 	ErrNoRows             = errors.New("query has returned no rows")
+	ErrUniqueKeyViolation = errors.New("unique key constraint was vioalted")
 )
 
 // Database object should be passed from the owner to users via reference, so after the owner closes

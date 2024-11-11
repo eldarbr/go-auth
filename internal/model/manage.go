@@ -1,12 +1,9 @@
 package model
 
-type CraeteUserRequest struct {
-	Auth    AuthResponse `json:"authorization"`
-	NewUser UserCreds    `json:"user"`
-}
+import "github.com/eldarbr/go-auth/internal/service/encrypt"
 
-type UserGroup struct {
-	Username    string `json:"username"`
-	UserRole    string `json:"userRole"`
-	ServiceName string `json:"serviceName"`
+type UserInfoResponse struct {
+	Username string                  `json:"username"`
+	Roles    []encrypt.ClaimUserRole `json:"roles"`
+	// TODO: not a fan of using the encrypt model here.
 }

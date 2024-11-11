@@ -5,15 +5,15 @@ import (
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
 )
 
-func PrepareClaims(dbGroups []database.UserGroup) []encrypt.ClaimUserGroupRole {
-	if len(dbGroups) == 0 {
+func PrepareClaims(dbRoles []database.UserRole) []encrypt.ClaimUserRole {
+	if len(dbRoles) == 0 {
 		return nil
 	}
 
-	claimGroups := make([]encrypt.ClaimUserGroupRole, 0, len(dbGroups))
+	claimGroups := make([]encrypt.ClaimUserRole, 0, len(dbRoles))
 
-	for _, dbEntry := range dbGroups {
-		newClaim := encrypt.ClaimUserGroupRole{
+	for _, dbEntry := range dbRoles {
+		newClaim := encrypt.ClaimUserRole{
 			ServiceName: dbEntry.ServiceName,
 			UserRole:    dbEntry.UserRole,
 		}

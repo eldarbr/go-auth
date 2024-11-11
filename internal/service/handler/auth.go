@@ -31,6 +31,7 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 
 	var creds model.UserCreds
 
+	// Decode the request body.
 	err := json.NewDecoder(request.Body).Decode(&creds)
 	if err != nil || creds.Password == "" || creds.Username == "" {
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "bad request"}, http.StatusBadRequest)
@@ -38,13 +39,16 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 		return
 	}
 
+	// Get username entry from the db.
 	dbUser, err := database.TableUsers.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(), creds.Username)
 	if errors.Is(err, database.ErrNoRows) || !encrypt.PasswordCompare(creds.Password, dbUser.Password) {
+		// ErrNoRows or wrong hash -> unauthorized.
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "unauthorized"}, http.StatusUnauthorized)
 
 		return
 	}
 
+	// Handle db query error.
 	if err != nil {
 		log.Printf("TableUsers.GetByUsername %s: %s", creds.Username, err.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
@@ -52,7 +56,8 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 		return
 	}
 
-	dbUserGroups, err := database.TableUsersGroups.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(),
+	// Get user's roles.
+	dbUserRoles, err := database.TableUsersRoles.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(),
 		dbUser.Username)
 	if err != nil && !errors.Is(err, database.ErrNoRows) {
 		log.Printf("TableUsersGroups.GetByUsername %s: %s", creds.Username, err.Error())
@@ -61,12 +66,14 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 		return
 	}
 
-	claimGroups := model.PrepareClaims(dbUserGroups)
+	// Convert the roles to custom jwt claims.
+	claims := model.PrepareClaims(dbUserRoles)
+
+	// Issue a token.
 	token, err := authHandl.jwtService.IssueToken(encrypt.AuthCustomClaims{
 		Username: dbUser.Username,
-		Groups:   claimGroups,
+		Roles:    claims,
 	})
-
 	if err != nil {
 		log.Printf("jwtService.IssueToken: %s", err.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
@@ -74,6 +81,7 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 		return
 	}
 
+	// Prepare the response body.
 	resp := model.UserTokenResponse{
 		AuthResponse: model.AuthResponse{Token: token},
 	}
