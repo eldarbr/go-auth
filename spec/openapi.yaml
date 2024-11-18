@@ -1,30 +1,23 @@
 openapi: 3.0.2
-
 info:
   title: go-auth
   description: SSO authn & authz
   version: 1.0.0
-
-
 tags:
   - name: auth
-  - name: management
-
+  - name: manage
 paths:
-  /auth/authenticate:
+  /authapi/auth/authenticate:
     post:
       tags:
         - auth
-
       summary: obtain token
-        
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/UserCreds'
-
       responses:
         '200':
           description: authentication is successful, user receives a token
@@ -33,40 +26,76 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserToken'
         '400':
-          description: bad request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: user didn't provide credentials
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: the credentials were rejected
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: the credentials were rejected
+          $ref: '#/components/responses/NotEnoughPermissions'
         '500':
-          description: internal error
+          $ref: '#/components/responses/InternalError'
+  /authapi/manage/users:
+    summary: manage users
+    get:
+      security:
+        - bearerAuth: []
+      tags:
+        - manage
+      summary: get user info
+      parameters:
+        - in: query
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: user info
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
-              example:
-                error: internal error
-  
+                $ref: '#/components/schemas/UserInfo'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/NotEnoughPermissions'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      security:
+        - bearerAuth: []
+      tags:
+        - manage
+      summary: create new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreds'
+      responses:
+        '200':
+          description: the user was created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/NotEnoughPermissions'
+        '500':
+          $ref: '#/components/responses/InternalError'
 components:
-  parameters:
-    APIKey:
-      name: api_key
-      in: query
-      required: true
-      description: Ключ доступа к API
-      schema:
-        type: string
-
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     UserCreds:
       properties:
@@ -82,10 +111,56 @@ components:
         error:
           type: string
       example:
-        error: Bad Request
+        error: bad Request
     UserToken:
       properties:
         token:
           type: string
       example:
         token: a valid token
+    UserInfo:
+      properties:
+        username:
+          type: string
+        groups:
+          type: array
+          items:
+            type: object
+            properties:
+              serviceName:
+                type: string
+              userRole:
+                type: string
+  responses:
+    UnauthorizedError:
+      description: access token is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: access token is missing or invalid
+    InternalError:
+      description: internal error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: internal error
+    BadRequest:
+      description: bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: bad request
+    NotEnoughPermissions:
+      description: not enough permissions to perform the operation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: not enough permissions to perform the operation
