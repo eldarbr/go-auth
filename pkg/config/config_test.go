@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/eldarbr/go-auth/internal/config"
+	"github.com/eldarbr/go-auth/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
