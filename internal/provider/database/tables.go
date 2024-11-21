@@ -20,9 +20,14 @@ const (
 	UserRoleTypeUser  UserRoleType = "user"
 )
 
-type User struct {
+type AddUser struct {
 	Username string
 	Password string
+}
+
+type User struct {
+	AddUser
+	ID string
 }
 
 type Service struct {
@@ -30,7 +35,7 @@ type Service struct {
 }
 
 type AddUserRole struct {
-	Username    string
+	UserID      string
 	UserRole    UserRoleType
 	ServiceName string
 }
@@ -48,10 +53,10 @@ type GroupUser struct {
 }
 
 var TableUsers interface {
-	Add(ctx context.Context, database Querier, user *User) error
-	Update(ctx context.Context, database Querier, user *User, username string) error
+	Add(ctx context.Context, database Querier, user *AddUser) (*User, error)
+	UpdateByUsername(ctx context.Context, database Querier, user *AddUser, username string) error
 	GetByUsername(ctx context.Context, database Querier, username string) (*User, error)
-	Delete(ctx context.Context, database Querier, username string) error
+	DeleteByUsername(ctx context.Context, database Querier, username string) error
 }
 
 var TableServices interface {
@@ -65,7 +70,7 @@ var TableUsersRoles interface {
 	Add(ctx context.Context, database Querier, useRole *AddUserRole) (*UserRole, error)
 	Insert(ctx context.Context, database Querier, useRole *UserRole) error
 	UpdateByID(ctx context.Context, database Querier, useRole *UserRole, dbEntryID uint) error
-	GetByUsername(ctx context.Context, database Querier, username string) ([]UserRole, error)
+	GetByUserID(ctx context.Context, database Querier, userID string) ([]UserRole, error)
 	GetByID(ctx context.Context, database Querier, dbEntryID uint) (*UserRole, error)
 	DeleteByID(ctx context.Context, database Querier, dbEntryID uint) error
 }

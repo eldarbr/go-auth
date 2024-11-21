@@ -6,6 +6,11 @@ type UserUsernme struct {
 	Username string `json:"username"`
 }
 
+type UserCreateResponse struct {
+	UserUsernme
+	UserID string `json:"userId"`
+}
+
 type UserCreds struct {
 	UserUsernme
 	Password string `json:"password"`

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 
@@ -45,12 +46,12 @@ func (manage ManageHandl) CreateUser(respWriter http.ResponseWriter, request *ht
 		return
 	}
 
-	dbUser := database.User{
+	dbUser := database.AddUser{
 		Username: parsedBody.Username,
 		Password: hashedPassword,
 	}
 
-	err = database.TableUsers.Add(request.Context(), manage.dbInstance.GetPool(), &dbUser)
+	dbCreatedUser, err := database.TableUsers.Add(request.Context(), manage.dbInstance.GetPool(), &dbUser)
 	if err != nil {
 		log.Printf("CreateUser - insert user err: %s", err.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
@@ -58,7 +59,10 @@ func (manage ManageHandl) CreateUser(respWriter http.ResponseWriter, request *ht
 		return
 	}
 
-	writeJSONResponse(respWriter, model.UserUsernme{Username: dbUser.Username}, http.StatusOK)
+	writeJSONResponse(respWriter, model.UserCreateResponse{
+		UserID:      dbCreatedUser.ID,
+		UserUsernme: model.UserUsernme{Username: dbCreatedUser.Username},
+	}, http.StatusOK)
 }
 
 func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *http.Request, _ httprouter.Params) {
@@ -71,9 +75,19 @@ func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *h
 		return
 	}
 
-	data, err := database.TableUsersRoles.GetByUsername(request.Context(), manage.dbInstance.GetPool(), requestedUsername)
-	if err != nil {
-		log.Printf("GetUserInfo - get user err: %s", err.Error())
+	userInfo, infoErr := database.TableUsers.GetByUsername(request.Context(),
+		manage.dbInstance.GetPool(), requestedUsername)
+	if infoErr != nil {
+		log.Printf("GetUserInfo - get user err: %s", infoErr.Error())
+		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
+
+		return
+	}
+
+	roles, rolesErr := database.TableUsersRoles.GetByUserID(request.Context(),
+		manage.dbInstance.GetPool(), requestedUsername)
+	if rolesErr != nil && !errors.Is(rolesErr, database.ErrNoRows) {
+		log.Printf("GetUserInfo - get user err: %s", rolesErr.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
 
 		return
@@ -81,7 +95,8 @@ func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *h
 
 	response := model.UserInfoResponse{
 		Username: requestedUsername,
-		Roles:    model.PrepareClaims(data),
+		UserID:   userInfo.ID,
+		Roles:    model.PrepareClaims(roles),
 	}
 
 	writeJSONResponse(respWriter, response, http.StatusOK)

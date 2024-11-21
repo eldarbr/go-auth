@@ -56,6 +56,8 @@ func main() {
 
 	defer dbInstance.ClosePool()
 
+	log.Println("Database setup ok")
+
 	var serv *http.Server
 	{
 		jwtService, jwtErr := encrypt.NewJWTService(conf.PrivatePemPath, conf.PublicPemPath, conf.AuthTokenTTL)

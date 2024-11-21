@@ -29,6 +29,7 @@ type ClaimUserRole struct {
 
 type AuthCustomClaims struct {
 	Username string          `json:"username"`
+	UserID   string          `json:"userId"`
 	Roles    []ClaimUserRole `json:"roles"`
 }
 

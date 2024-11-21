@@ -57,8 +57,8 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 	}
 
 	// Get user's roles.
-	dbUserRoles, err := database.TableUsersRoles.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(),
-		dbUser.Username)
+	dbUserRoles, err := database.TableUsersRoles.GetByUserID(request.Context(), authHandl.dbInstance.GetPool(),
+		dbUser.ID)
 	if err != nil && !errors.Is(err, database.ErrNoRows) {
 		log.Printf("TableUsersGroups.GetByUsername %s: %s", creds.Username, err.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
@@ -73,6 +73,7 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 	token, err := authHandl.jwtService.IssueToken(encrypt.AuthCustomClaims{
 		Username: dbUser.Username,
 		Roles:    claims,
+		UserID:   dbUser.ID,
 	})
 	if err != nil {
 		log.Printf("jwtService.IssueToken: %s", err.Error())

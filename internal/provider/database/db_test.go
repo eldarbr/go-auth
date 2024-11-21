@@ -41,11 +41,14 @@ func TestNilArguments(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	require.ErrorIs(t, database.TableUsers.Add(context.Background(), testDB.GetPool(), nil), database.ErrNilArgument)
+	_, err := database.TableUsers.Add(context.Background(), testDB.GetPool(), nil)
+
+	require.ErrorIs(t, err, database.ErrNilArgument)
+
 	require.ErrorIs(t, database.TableServices.Add(context.Background(), testDB.GetPool(), nil),
 		database.ErrNilArgument)
 
-	_, err := database.TableUsersRoles.Add(context.Background(), testDB.GetPool(), nil)
+	_, err = database.TableUsersRoles.Add(context.Background(), testDB.GetPool(), nil)
 
 	require.ErrorIs(t, err, database.ErrNilArgument)
 	require.ErrorIs(t, database.TableUsersRoles.Insert(context.Background(), testDB.GetPool(), nil),
@@ -58,16 +61,16 @@ func TestNilDB(t *testing.T) {
 
 	// nil is an unitialized db.
 
-	err := database.TableUsers.Add(context.Background(), nil, nil)
+	_, err := database.TableUsers.Add(context.Background(), nil, nil)
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
-	err = database.TableUsers.Update(context.Background(), nil, nil, "")
+	err = database.TableUsers.UpdateByUsername(context.Background(), nil, nil, "")
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
 	_, err = database.TableUsers.GetByUsername(context.Background(), nil, "")
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
-	err = database.TableUsers.Delete(context.Background(), nil, "")
+	err = database.TableUsers.DeleteByUsername(context.Background(), nil, "")
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
 	err = database.TableServices.Add(context.Background(), nil, nil)
@@ -94,7 +97,7 @@ func TestNilDB(t *testing.T) {
 	_, err = database.TableUsersRoles.GetByID(context.Background(), nil, 0)
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
-	_, err = database.TableUsersRoles.GetByUsername(context.Background(), nil, "")
+	_, err = database.TableUsersRoles.GetByUserID(context.Background(), nil, "")
 	require.ErrorIs(t, err, database.ErrDBNotInitilized)
 
 	err = database.TableUsersRoles.DeleteByID(context.Background(), nil, 0)
@@ -105,7 +108,7 @@ func TestUsersValidAddAndGet(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	users := []database.User{
+	users := []database.AddUser{
 		{
 			Username: "username1",
 			Password: "password1",
@@ -121,8 +124,10 @@ func TestUsersValidAddAndGet(t *testing.T) {
 	}
 
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
+		added, err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
+		assert.Equal(t, user.Username, added.Username)
+		assert.Equal(t, user.Password, added.Password)
 	}
 
 	for _, user := range users {
@@ -138,7 +143,7 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	users := []database.User{
+	users := []database.AddUser{
 		{
 			Username: "1username1",
 			Password: "1password1",
@@ -155,11 +160,11 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Add.
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
+		_, err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
 	}
 
-	newUsers := []database.User{
+	newUsers := []database.AddUser{
 		{
 			Username: "1username1",        // Same as before.
 			Password: "passsssssssssssss", // New password.
@@ -176,7 +181,7 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Update.
 	for i := range users {
-		err := database.TableUsers.Update(context.Background(), testDB.GetPool(), &newUsers[i], users[i].Username)
+		err := database.TableUsers.UpdateByUsername(context.Background(), testDB.GetPool(), &newUsers[i], users[i].Username)
 		require.NoError(t, err)
 	}
 
@@ -191,8 +196,14 @@ func TestUsersValidUpdateAndDelete(t *testing.T) {
 
 	// Delete.
 	for i := range newUsers {
-		err := database.TableUsers.Delete(context.Background(), testDB.GetPool(), newUsers[i].Username)
+		err := database.TableUsers.DeleteByUsername(context.Background(), testDB.GetPool(), newUsers[i].Username)
 		require.NoError(t, err)
+	}
+
+	// Assert deletion.
+	for i := range users {
+		_, err := database.TableUsers.GetByUsername(context.Background(), testDB.GetPool(), newUsers[i].Username)
+		require.ErrorIs(t, err, database.ErrNoRows)
 	}
 }
 
@@ -212,11 +223,11 @@ func TestUsersInvalidGetUpdateDelete(t *testing.T) {
 			assert.Nil(t, ret)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
-			var dummy database.User
-			err = database.TableUsers.Update(context.Background(), testDB.GetPool(), &dummy, username)
+			var dummy database.AddUser
+			err = database.TableUsers.UpdateByUsername(context.Background(), testDB.GetPool(), &dummy, username)
 			require.ErrorIs(t, database.ErrNoRows, err)
 
-			err = database.TableUsers.Delete(context.Background(), testDB.GetPool(), username)
+			err = database.TableUsers.DeleteByUsername(context.Background(), testDB.GetPool(), username)
 			require.ErrorIs(t, database.ErrNoRows, err)
 		})
 	}
@@ -338,26 +349,26 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	setupForValidUserGroupsAddAndGet(t, "1")
+	idsMap := setupForValidUserGroupsAddAndGet(t, "1")
 
 	usersGroups := []database.AddUserRole{
 		{
-			Username:    "username111",
+			UserID:      idsMap["username111"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service111",
 		},
 		{
-			Username:    "username111",
+			UserID:      idsMap["username111"],
 			UserRole:    database.UserRoleTypeAdmin,
 			ServiceName: "service211",
 		},
 		{
-			Username:    "username211",
+			UserID:      idsMap["username211"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service211",
 		},
 		{
-			Username:    "username311",
+			UserID:      idsMap["username311"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service211",
 		},
@@ -370,29 +381,29 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 		dbUserGroup, err := database.TableUsersRoles.Add(context.Background(), testDB.GetPool(), &userGroup)
 		require.NoError(t, err)
 		require.NotNil(t, dbUserGroup)
-		assert.Equal(t, userGroup.Username, dbUserGroup.Username)
+		assert.Equal(t, userGroup.UserID, dbUserGroup.UserID)
 		assert.Equal(t, userGroup.UserRole, dbUserGroup.UserRole)
 		assert.Equal(t, userGroup.ServiceName, dbUserGroup.ServiceName)
 		assert.NotEqual(t, 0, dbUserGroup.ID)
 		assert.NotEqualValues(t, 0, dbUserGroup.CreatedTS)
 
-		mapCntGroupsOfAUser[userGroup.Username]++
+		mapCntGroupsOfAUser[userGroup.UserID]++
 
 		listInsertedEntries = append(listInsertedEntries, *dbUserGroup)
 	}
 
 	for _, userGroup := range usersGroups {
-		dbUserGroups, err := database.TableUsersRoles.GetByUsername(context.Background(), testDB.GetPool(),
-			userGroup.Username)
+		dbUserGroups, err := database.TableUsersRoles.GetByUserID(context.Background(), testDB.GetPool(),
+			userGroup.UserID)
 		require.NoError(t, err)
 		require.NotNil(t, dbUserGroups)
 
-		assert.Len(t, dbUserGroups, mapCntGroupsOfAUser[userGroup.Username])
+		assert.Len(t, dbUserGroups, mapCntGroupsOfAUser[userGroup.UserID])
 
 		foundInDB := false
 
 		for _, dbGroup := range dbUserGroups {
-			if dbGroup.Username == userGroup.Username &&
+			if dbGroup.UserID == userGroup.UserID &&
 				dbGroup.ServiceName == userGroup.ServiceName &&
 				dbGroup.UserRole == userGroup.UserRole {
 				foundInDB = true
@@ -410,15 +421,17 @@ func TestUsersGroupsValidAddAndGet(t *testing.T) {
 		require.NotNil(t, dbEntry)
 
 		assert.ElementsMatch(t,
-			[]any{inserted.ID, inserted.Username, inserted.ServiceName, inserted.CreatedTS.String(), inserted.UserRole},
-			[]any{dbEntry.ID, dbEntry.Username, dbEntry.ServiceName, dbEntry.CreatedTS.String(), dbEntry.UserRole},
+			[]any{inserted.ID, inserted.UserID, inserted.ServiceName, inserted.CreatedTS.String(), inserted.UserRole},
+			[]any{dbEntry.ID, dbEntry.UserID, dbEntry.ServiceName, dbEntry.CreatedTS.String(), dbEntry.UserRole},
 		)
 	}
 }
 
-func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) {
+func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) map[string]string {
 	t.Helper()
 	checkDB(t)
+
+	resultingMap := make(map[string]string)
 
 	// START OF SETUP.
 	services := []database.Service{
@@ -438,7 +451,7 @@ func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) {
 		require.NoError(t, err)
 	}
 
-	users := []database.User{
+	users := []database.AddUser{
 		{
 			Username: "username11" + suffix,
 			Password: "password1" + suffix,
@@ -454,9 +467,13 @@ func setupForValidUserGroupsAddAndGet(t *testing.T, suffix string) {
 	}
 
 	for _, user := range users {
-		err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
+		added, err := database.TableUsers.Add(context.Background(), testDB.GetPool(), &user)
 		require.NoError(t, err)
+
+		resultingMap[added.Username] = added.ID
 	}
+
+	return resultingMap
 }
 
 //nolint:funlen // Won't decompose.
@@ -464,26 +481,26 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 	t.Parallel() // Running all db tests in parallel.
 	checkDB(t)
 
-	setupForValidUserGroupsAddAndGet(t, "2")
+	idsMap := setupForValidUserGroupsAddAndGet(t, "2")
 
 	usersGroups := []database.AddUserRole{
 		{
-			Username:    "username112",
+			UserID:      idsMap["username112"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service312",
 		},
 		{
-			Username:    "username112",
+			UserID:      idsMap["username112"],
 			UserRole:    database.UserRoleTypeAdmin,
 			ServiceName: "service212",
 		},
 		{
-			Username:    "username212",
+			UserID:      idsMap["username212"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service212",
 		},
 		{
-			Username:    "username312",
+			UserID:      idsMap["username312"],
 			UserRole:    database.UserRoleTypeUser,
 			ServiceName: "service212",
 		},
@@ -504,7 +521,6 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 
 	// Mutate.
 	insertedEntries[0].UserRole = database.UserRoleTypeRoot
-	insertedEntries[1].Username = "username112"
 	insertedEntries[1].ID = 97654
 	insertedEntries[2].ServiceName = "service112"
 	insertedEntries[2].UserRole = database.UserRoleTypeAdmin
@@ -525,8 +541,8 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 		require.NotNil(t, dbEntry)
 
 		assert.ElementsMatch(t,
-			[]any{inserted.ID, inserted.Username, inserted.ServiceName, inserted.CreatedTS.String(), inserted.UserRole},
-			[]any{dbEntry.ID, dbEntry.Username, dbEntry.ServiceName, dbEntry.CreatedTS.String(), dbEntry.UserRole},
+			[]any{inserted.ID, inserted.UserID, inserted.ServiceName, inserted.CreatedTS.String(), inserted.UserRole},
+			[]any{dbEntry.ID, dbEntry.UserID, dbEntry.ServiceName, dbEntry.CreatedTS.String(), dbEntry.UserRole},
 		)
 	}
 
@@ -534,37 +550,5 @@ func TestUsersGroupsValidUpdateAndDelete(t *testing.T) {
 	for i := range insertedEntries {
 		err := database.TableUsersRoles.DeleteByID(context.Background(), testDB.GetPool(), insertedEntries[i].ID)
 		require.NoError(t, err)
-	}
-}
-
-func TestUsersGroupsInvalidGetUpdateDelete(t *testing.T) {
-	t.Parallel() // Running all db tests in parallel.
-	checkDB(t)
-
-	usernames := []string{"123", "", "12345678901234567890", "true", "nameuser", "AAAAAAA", "bbbbbBBBBBB",
-		"1234567890123456789012345678901234567890", "nothing to see here"}
-
-	for _, username := range usernames {
-		t.Run(username, func(t *testing.T) {
-			t.Parallel()
-
-			invalidID := uint(len(username) + 99999) //nolint:gosec // no overflow is possible.
-
-			ret1, err := database.TableUsersRoles.GetByUsername(context.Background(), testDB.GetPool(), username)
-			assert.Empty(t, ret1)
-			require.NoError(t, err)
-
-			ret2, err := database.TableUsersRoles.GetByID(context.Background(), testDB.GetPool(), invalidID)
-			assert.Nil(t, ret2)
-			require.ErrorIs(t, database.ErrNoRows, err)
-
-			var dummy database.UserRole
-			dummy.UserRole = database.UserRoleTypeUser
-			err = database.TableUsersRoles.UpdateByID(context.Background(), testDB.GetPool(), &dummy, invalidID)
-			require.ErrorIs(t, database.ErrNoRows, err)
-
-			err = database.TableUsersRoles.DeleteByID(context.Background(), testDB.GetPool(), invalidID)
-			require.ErrorIs(t, database.ErrNoRows, err)
-		})
 	}
 }
