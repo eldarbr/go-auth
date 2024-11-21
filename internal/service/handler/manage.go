@@ -15,12 +15,17 @@ import (
 type ManageHandl struct {
 	dbInstance *database.Database
 	jwtService *encrypt.JWTService
+	cache      CacheImpl
+	reqLimit   int
 }
 
-func NewManageHandl(dbInstance *database.Database, jwtService *encrypt.JWTService) ManageHandl {
+func NewManageHandl(dbInstance *database.Database, jwtService *encrypt.JWTService,
+	cache CacheImpl, limit int) ManageHandl {
 	srv := ManageHandl{
 		dbInstance: dbInstance,
 		jwtService: jwtService,
+		cache:      cache,
+		reqLimit:   limit,
 	}
 
 	return srv
@@ -117,6 +122,34 @@ func (manage ManageHandl) MiddlewareAuthorizeAnyClaim(requestedClaims []encrypt.
 			writeJSONResponse(respWriter, model.ErrorResponse{Error: "forbidden"}, http.StatusForbidden)
 
 			return
+		}
+
+		request.Header.Set("X-Requester-Username", claims.Username)
+
+		next(respWriter, request, routerParams)
+	}
+}
+
+func (manage ManageHandl) MiddlewareRateLimit(next httprouter.Handle) httprouter.Handle {
+	return func(respWriter http.ResponseWriter, request *http.Request, routerParams httprouter.Params) {
+		if manage.cache == nil {
+			log.Println("MiddlewareRateLimit uninitialized cache")
+			writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
+
+			return
+		}
+
+		username := request.Header.Get("X-Requester-Username")
+
+		if username != "" {
+			lookups := manage.cache.GetAndIncrease("usr:" + username)
+			if lookups > manage.reqLimit {
+				writeJSONResponse(respWriter, model.ErrorResponse{Error: "rate limited"}, http.StatusTooManyRequests)
+
+				return
+			}
+		} else {
+			log.Println("Manage Handler MiddlewareRateLimit didn't make a cache lookup - empty username")
 		}
 
 		next(respWriter, request, routerParams)

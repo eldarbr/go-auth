@@ -15,12 +15,17 @@ import (
 type AuthHandl struct {
 	dbInstance *database.Database
 	jwtService *encrypt.JWTService
+	cache      CacheImpl
+	reqLimit   int
 }
 
-func NewAuthHandl(dbInstance *database.Database, jwtService *encrypt.JWTService) AuthHandl {
+func NewAuthHandl(dbInstance *database.Database, jwtService *encrypt.JWTService,
+	cache CacheImpl, limit int) AuthHandl {
 	srv := AuthHandl{
 		dbInstance: dbInstance,
 		jwtService: jwtService,
+		cache:      cache,
+		reqLimit:   limit,
 	}
 
 	return srv
@@ -35,6 +40,13 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 	err := json.NewDecoder(request.Body).Decode(&creds)
 	if err != nil || creds.Password == "" || creds.Username == "" {
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "bad request"}, http.StatusBadRequest)
+
+		return
+	}
+
+	lookups := authHandl.cache.GetAndIncrease("usr:" + creds.Username)
+	if lookups > authHandl.reqLimit {
+		writeJSONResponse(respWriter, model.ErrorResponse{Error: "rate limited"}, http.StatusTooManyRequests)
 
 		return
 	}

@@ -3,6 +3,7 @@
 bin/
 secret/
 config.yaml
+*.pprof
 
 ### go section
 
