@@ -16,7 +16,6 @@ import (
 
 type programConf struct {
 	DBUri             string        `yaml:"dbUri"`
-	DBMigrationsPath  string        `yaml:"dbMigrations"`
 	ServingURI        string        `yaml:"servingUri"`
 	PrivatePemPath    string        `yaml:"privatePemPath"`
 	PublicPemPath     string        `yaml:"publicPemPath"`
@@ -30,7 +29,10 @@ type programConf struct {
 	RateLimitCapacity int           `yaml:"rateLimitCapacity"`
 }
 
-const CacheAutoEvictPeriodSeconds = 120
+const (
+	CacheAutoEvictPeriodSeconds = 120
+	DBMigrationsPath            = "file://./sql" // expect the migrations to be next to the app.
+)
 
 func (conf *programConf) setDefaults() {
 	if conf == nil {
@@ -65,7 +67,7 @@ func main() {
 		}()
 	}
 
-	dbInstance, err := database.Setup(programContext, conf.DBUri, conf.DBMigrationsPath)
+	dbInstance, err := database.Setup(programContext, conf.DBUri, DBMigrationsPath)
 	if err != nil {
 		log.Println(err)
 
