@@ -7,10 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/eldarbr/go-auth/internal/service/cache"
+	"github.com/eldarbr/go-auth/pkg/cache"
 	"github.com/stretchr/testify/require"
-	// "github.com/stretchr/testify/assert"
-	// "github.com/stretchr/testify/require"
 )
 
 var _ = flag.String("t-db-uri", "", "perform sql tests on the `t-db-uri` database")

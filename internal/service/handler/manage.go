@@ -90,7 +90,7 @@ func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *h
 	}
 
 	roles, rolesErr := database.TableUsersRoles.GetByUserID(request.Context(),
-		manage.dbInstance.GetPool(), requestedUsername)
+		manage.dbInstance.GetPool(), userInfo.ID)
 	if rolesErr != nil && !errors.Is(rolesErr, database.ErrNoRows) {
 		log.Printf("GetUserInfo - get user err: %s", rolesErr.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
