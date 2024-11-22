@@ -30,6 +30,8 @@ type programConf struct {
 	RateLimitCapacity int           `yaml:"rateLimitCapacity"`
 }
 
+const CacheAutoEvictPeriodSeconds = 120
+
 func (conf *programConf) setDefaults() {
 	if conf == nil {
 		return
@@ -76,7 +78,7 @@ func main() {
 
 	cache := cache.NewCache(conf.RateLimitTTL, conf.RateLimitCapacity)
 
-	go cache.AutoEvict(120 * time.Second)
+	go cache.AutoEvict(CacheAutoEvictPeriodSeconds * time.Second)
 	defer cache.StopAutoEvict()
 
 	var serv *http.Server

@@ -125,7 +125,7 @@ func (cache *Cache) set(newItem *cacheItem) {
 	if cache.items[newItem.key] != nil {
 		cache.items[newItem.key].Value.(*cacheItem).value = newItem.value
 		cache.items[newItem.key].Value.(*cacheItem).expires = newItem.expires
-		cache.lru.MoveToFront(cache.items[newItem.key])
+		cache.lru.MoveToBack(cache.items[newItem.key])
 	} else {
 		cache.items[newItem.key] = cache.lru.PushBack(newItem)
 	}
@@ -141,7 +141,9 @@ func (cache *Cache) GetAndIncrease(key string) int {
 	cache.mu.Lock()
 
 	listItem, keyOk := cache.items[key]
-	if keyOk {
+
+	// set value (1) if there was no such key, or if the entry has expired.
+	if keyOk && listItem.Value.(*cacheItem).expires > time.Now().Unix() {
 		newItem = *listItem.Value.(*cacheItem)
 		listItem.Value.(*cacheItem).value++
 		listItem.Value.(*cacheItem).expires = time.Now().Unix() + cache.ttl
@@ -151,19 +153,6 @@ func (cache *Cache) GetAndIncrease(key string) int {
 	}
 
 	cache.mu.Unlock()
-
-	if !keyOk {
-		return newItem.value
-	}
-
-	if newItem.expires <= time.Now().Unix() {
-		cache.mu.Lock()
-		delete(cache.items, key)
-		cache.lru.Remove(listItem)
-		cache.mu.Unlock()
-
-		return newItem.value
-	}
 
 	return newItem.value
 }
