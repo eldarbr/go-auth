@@ -101,7 +101,7 @@ func (cache *Cache) Get(key string) (int, error) {
 // Set sets a new value.
 func (cache *Cache) Set(key string, value int) {
 	//nolint:exhaustruct // the expiration will be filled later.
-	newItem := &cacheItem{
+	newItem := cacheItem{
 		value: value,
 		key:   key,
 	}
@@ -113,7 +113,7 @@ func (cache *Cache) Set(key string, value int) {
 	cache.mu.Unlock()
 }
 
-func (cache *Cache) set(newItem *cacheItem) {
+func (cache *Cache) set(newItem cacheItem) {
 	for cache.lru.Len() > cache.capacity {
 		front := cache.lru.Front()
 		delete(cache.items, front.Value.(*cacheItem).key)
@@ -127,7 +127,7 @@ func (cache *Cache) set(newItem *cacheItem) {
 		cache.items[newItem.key].Value.(*cacheItem).expires = newItem.expires
 		cache.lru.MoveToBack(cache.items[newItem.key])
 	} else {
-		cache.items[newItem.key] = cache.lru.PushBack(newItem)
+		cache.items[newItem.key] = cache.lru.PushBack(&newItem)
 	}
 }
 
@@ -149,7 +149,7 @@ func (cache *Cache) GetAndIncrease(key string) int {
 		listItem.Value.(*cacheItem).expires = time.Now().Unix() + cache.ttl
 		cache.lru.MoveToBack(listItem)
 	} else {
-		cache.set(&newItem)
+		cache.set(newItem)
 	}
 
 	cache.mu.Unlock()
