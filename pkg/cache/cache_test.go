@@ -18,23 +18,23 @@ func TestMegaSetLowCap(t *testing.T) {
 
 	cache := cache.NewCache(999, 10)
 
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 
 	for range 100 {
-		wg.Add(1)
+		waitGroup.Add(1)
 
 		go func() {
 			for range 10000 {
-				i := rand.Intn(15)
+				i := rand.Intn(15) //nolint:gosec // not a sensitive generation.
 				key := strconv.Itoa(i)
 				cache.Set(key, i)
 			}
 
-			wg.Done()
+			waitGroup.Done()
 		}()
 	}
 
-	wg.Wait()
+	waitGroup.Wait()
 }
 
 func TestGetAndIncreaseParallel(t *testing.T) {
@@ -42,21 +42,21 @@ func TestGetAndIncreaseParallel(t *testing.T) {
 
 	cache := cache.NewCache(999, 100000)
 
-	var wg sync.WaitGroup
+	var waitGroup sync.WaitGroup
 
 	for range 100 {
-		wg.Add(1)
+		waitGroup.Add(1)
 
 		go func() {
 			for range 10000 {
 				cache.GetAndIncrease("123")
 			}
 
-			wg.Done()
+			waitGroup.Done()
 		}()
 	}
 
-	wg.Wait()
+	waitGroup.Wait()
 
 	val, err := cache.Get("123")
 	require.NoError(t, err)

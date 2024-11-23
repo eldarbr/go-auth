@@ -1,11 +1,11 @@
 package model
 
 import (
-	"github.com/eldarbr/go-auth/internal/provider/database"
+	"github.com/eldarbr/go-auth/internal/provider/storage"
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
 )
 
-func PrepareClaims(dbRoles []database.UserRole) []encrypt.ClaimUserRole {
+func PrepareClaims(dbRoles []storage.UserRole) []encrypt.ClaimUserRole {
 	if len(dbRoles) == 0 {
 		return nil
 	}

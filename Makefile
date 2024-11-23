@@ -25,6 +25,6 @@ coverage:
 
 clean:
 	rm -rf bin
-	find . -name "*.pprof" -print0 | xargs -0 rm
+	find . -name "*.pprof" -print0 | xargs -0 rm -f
 
 generate:

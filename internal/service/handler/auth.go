@@ -7,8 +7,9 @@ import (
 	"net/http"
 
 	"github.com/eldarbr/go-auth/internal/model"
-	"github.com/eldarbr/go-auth/internal/provider/database"
+	"github.com/eldarbr/go-auth/internal/provider/storage"
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
+	"github.com/eldarbr/go-auth/pkg/database"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -52,7 +53,7 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 	}
 
 	// Get username entry from the db.
-	dbUser, err := database.TableUsers.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(), creds.Username)
+	dbUser, err := storage.TableUsers.GetByUsername(request.Context(), authHandl.dbInstance.GetPool(), creds.Username)
 	if errors.Is(err, database.ErrNoRows) || !encrypt.PasswordCompare(creds.Password, dbUser.Password) {
 		// ErrNoRows or wrong hash -> unauthorized.
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "unauthorized"}, http.StatusUnauthorized)
@@ -69,7 +70,7 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter, request 
 	}
 
 	// Get user's roles.
-	dbUserRoles, err := database.TableUsersRoles.GetByUserID(request.Context(), authHandl.dbInstance.GetPool(),
+	dbUserRoles, err := storage.TableUsersRoles.GetByUserID(request.Context(), authHandl.dbInstance.GetPool(),
 		dbUser.ID)
 	if err != nil && !errors.Is(err, database.ErrNoRows) {
 		log.Printf("TableUsersGroups.GetByUsername %s: %s", creds.Username, err.Error())

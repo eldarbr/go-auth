@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/eldarbr/go-auth/internal/provider/database"
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
 	"github.com/eldarbr/go-auth/internal/service/handler"
 	"github.com/eldarbr/go-auth/internal/service/server"
 	"github.com/eldarbr/go-auth/pkg/cache"
 	"github.com/eldarbr/go-auth/pkg/config"
+	"github.com/eldarbr/go-auth/pkg/database"
 )
 
 type programConf struct {

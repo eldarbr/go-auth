@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/eldarbr/go-auth/internal/provider/database"
+	"github.com/eldarbr/go-auth/internal/provider/storage"
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
 	"github.com/julienschmidt/httprouter"
 )
@@ -41,11 +41,11 @@ func NewRouter(common CommonHandlingModule, auth AuthHandlingModule,
 	handler.POST("/auth/authenticate", auth.Authenticate)
 
 	handler.POST("/manage/users", ratelimiter.MiddlewareIPRateLimit(manage.MiddlewareAuthorizeAnyClaim(
-		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: database.UserRoleTypeRoot}},
+		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: storage.UserRoleTypeRoot}},
 		manage.MiddlewareRateLimit(manage.CreateUser),
 	)))
 	handler.GET("/manage/users", ratelimiter.MiddlewareIPRateLimit(manage.MiddlewareAuthorizeAnyClaim(
-		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: database.UserRoleTypeRoot}},
+		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: storage.UserRoleTypeRoot}},
 		manage.MiddlewareRateLimit(manage.GetUserInfo),
 	)))
 

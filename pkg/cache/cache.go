@@ -14,15 +14,15 @@ var (
 type Cache struct {
 	items    map[string]*list.Element
 	lru      *list.List
-	mu       sync.RWMutex
+	stopChan chan any
 	ttl      int64
 	capacity int
-	stopChan chan any
+	mu       sync.RWMutex
 }
 
 type cacheItem struct {
-	value   int
 	key     string
+	value   int
 	expires int64 // unixtime.
 }
 
@@ -133,7 +133,7 @@ func (cache *Cache) set(newItem cacheItem) {
 
 // GetAndIncrease retrieves a value and increases it in the cache with ttl update.
 func (cache *Cache) GetAndIncrease(key string) int {
-	newItem := cacheItem{
+	newItem := cacheItem{ //nolint:exhaustruct // the 'expires' is not used.
 		value: 1,
 		key:   key,
 	}

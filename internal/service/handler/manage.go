@@ -7,8 +7,9 @@ import (
 	"net/http"
 
 	"github.com/eldarbr/go-auth/internal/model"
-	"github.com/eldarbr/go-auth/internal/provider/database"
+	"github.com/eldarbr/go-auth/internal/provider/storage"
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
+	"github.com/eldarbr/go-auth/pkg/database"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -51,12 +52,12 @@ func (manage ManageHandl) CreateUser(respWriter http.ResponseWriter, request *ht
 		return
 	}
 
-	dbUser := database.AddUser{
+	dbUser := storage.AddUser{
 		Username: parsedBody.Username,
 		Password: hashedPassword,
 	}
 
-	dbCreatedUser, err := database.TableUsers.Add(request.Context(), manage.dbInstance.GetPool(), &dbUser)
+	dbCreatedUser, err := storage.TableUsers.Add(request.Context(), manage.dbInstance.GetPool(), &dbUser)
 	if err != nil {
 		log.Printf("CreateUser - insert user err: %s", err.Error())
 		writeJSONResponse(respWriter, model.ErrorResponse{Error: "internal error"}, http.StatusInternalServerError)
@@ -80,7 +81,7 @@ func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *h
 		return
 	}
 
-	userInfo, infoErr := database.TableUsers.GetByUsername(request.Context(),
+	userInfo, infoErr := storage.TableUsers.GetByUsername(request.Context(),
 		manage.dbInstance.GetPool(), requestedUsername)
 	if infoErr != nil {
 		log.Printf("GetUserInfo - get user err: %s", infoErr.Error())
@@ -89,7 +90,7 @@ func (manage ManageHandl) GetUserInfo(respWriter http.ResponseWriter, request *h
 		return
 	}
 
-	roles, rolesErr := database.TableUsersRoles.GetByUserID(request.Context(),
+	roles, rolesErr := storage.TableUsersRoles.GetByUserID(request.Context(),
 		manage.dbInstance.GetPool(), userInfo.ID)
 	if rolesErr != nil && !errors.Is(rolesErr, database.ErrNoRows) {
 		log.Printf("GetUserInfo - get user err: %s", rolesErr.Error())

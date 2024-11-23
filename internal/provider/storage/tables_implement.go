@@ -1,4 +1,4 @@
-package database
+package storage
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/eldarbr/go-auth/pkg/database"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,13 +16,13 @@ type implTableServices struct{}
 
 type implTableUsersRoles struct{}
 
-func (s implTableUsers) Add(ctx context.Context, database Querier, user *AddUser) (*User, error) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+func (s implTableUsers) Add(ctx context.Context, querier database.Querier, user *AddUser) (*User, error) {
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	if user == nil {
-		return nil, ErrNilArgument
+		return nil, database.ErrNilArgument
 	}
 
 	query := `
@@ -38,15 +39,15 @@ RETURNING
 
 	var dst User
 
-	queryResult := database.QueryRow(ctx, query, user.Username, user.Password)
+	queryResult := querier.QueryRow(ctx, query, user.Username, user.Password)
 	err := queryResult.Scan(&dst.Username, &dst.Password, &dst.ID)
 
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return nil, ErrUniqueKeyViolation
+		return nil, database.ErrUniqueKeyViolation
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRows
+		return nil, database.ErrNoRows
 	}
 
 	if err != nil {
@@ -56,13 +57,14 @@ RETURNING
 	return &dst, nil
 }
 
-func (s implTableUsers) UpdateByUsername(ctx context.Context, database Querier, user *AddUser, username string) error {
-	if database == nil {
-		return ErrDBNotInitilized
+func (s implTableUsers) UpdateByUsername(ctx context.Context, querier database.Querier,
+	user *AddUser, username string) error {
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	if user == nil {
-		return ErrNilArgument
+		return database.ErrNilArgument
 	}
 
 	query := `
@@ -73,9 +75,9 @@ SET
 WHERE "username" = $3
 	`
 
-	result, err := database.Exec(ctx, query, user.Username, user.Password, username)
+	result, err := querier.Exec(ctx, query, user.Username, user.Password, username)
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return ErrUniqueKeyViolation
+		return database.ErrUniqueKeyViolation
 	}
 
 	if err != nil {
@@ -83,15 +85,15 @@ WHERE "username" = $3
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
 }
 
-func (s implTableUsers) GetByUsername(ctx context.Context, database Querier, username string) (*User, error) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+func (s implTableUsers) GetByUsername(ctx context.Context, querier database.Querier, username string) (*User, error) {
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -105,11 +107,11 @@ WHERE "username" = $1
 
 	var dst User
 
-	queryResult := database.QueryRow(ctx, query, username)
+	queryResult := querier.QueryRow(ctx, query, username)
 	err := queryResult.Scan(&dst.Username, &dst.Password, &dst.ID)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRows
+		return nil, database.ErrNoRows
 	}
 
 	if err != nil {
@@ -119,9 +121,9 @@ WHERE "username" = $1
 	return &dst, nil
 }
 
-func (s implTableUsers) DeleteByUsername(ctx context.Context, database Querier, username string) error {
-	if database == nil {
-		return ErrDBNotInitilized
+func (s implTableUsers) DeleteByUsername(ctx context.Context, querier database.Querier, username string) error {
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -129,25 +131,25 @@ DELETE FROM "users"
 WHERE "username" = $1
 	`
 
-	result, err := database.Exec(ctx, query, username)
+	result, err := querier.Exec(ctx, query, username)
 	if err != nil {
 		return fmt.Errorf("TableUsers.Delete failed on DELETE: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
 }
 
-func (s implTableServices) Add(ctx context.Context, database Querier, service *Service) error {
-	if database == nil {
-		return ErrDBNotInitilized
+func (s implTableServices) Add(ctx context.Context, querier database.Querier, service *Service) error {
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	if service == nil {
-		return ErrNilArgument
+		return database.ErrNilArgument
 	}
 
 	query := `
@@ -157,9 +159,9 @@ VALUES
   ($1)
 	`
 
-	_, err := database.Exec(ctx, query, service.Name)
+	_, err := querier.Exec(ctx, query, service.Name)
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return ErrUniqueKeyViolation
+		return database.ErrUniqueKeyViolation
 	}
 
 	if err != nil {
@@ -169,15 +171,14 @@ VALUES
 	return nil
 }
 
-func (s implTableServices) Update(ctx context.Context, database Querier, service *Service,
+func (s implTableServices) Update(ctx context.Context, querier database.Querier, service *Service,
 	serviceName string) error {
-
-	if database == nil {
-		return ErrDBNotInitilized
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	if service == nil {
-		return ErrNilArgument
+		return database.ErrNilArgument
 	}
 
 	query := `
@@ -187,9 +188,9 @@ SET
 WHERE "name" = $2
 	`
 
-	result, err := database.Exec(ctx, query, service.Name, serviceName)
+	result, err := querier.Exec(ctx, query, service.Name, serviceName)
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return ErrUniqueKeyViolation
+		return database.ErrUniqueKeyViolation
 	}
 
 	if err != nil {
@@ -197,17 +198,17 @@ WHERE "name" = $2
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
 }
 
-func (s implTableServices) GetByServiceName(ctx context.Context, database Querier,
+func (s implTableServices) GetByServiceName(ctx context.Context, querier database.Querier,
 	serviceName string) (*Service, error,
 ) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -219,11 +220,11 @@ WHERE "name" = $1
 
 	var dst Service
 
-	queryResult := database.QueryRow(ctx, query, serviceName)
+	queryResult := querier.QueryRow(ctx, query, serviceName)
 	err := queryResult.Scan(&dst.Name)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRows
+		return nil, database.ErrNoRows
 	}
 
 	if err != nil {
@@ -233,11 +234,10 @@ WHERE "name" = $1
 	return &dst, nil
 }
 
-func (s implTableServices) Delete(ctx context.Context, database Querier,
+func (s implTableServices) Delete(ctx context.Context, querier database.Querier,
 	serviceName string) error {
-
-	if database == nil {
-		return ErrDBNotInitilized
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -245,28 +245,28 @@ DELETE FROM "services"
 WHERE "name" = $1
 	`
 
-	result, err := database.Exec(ctx, query, serviceName)
+	result, err := querier.Exec(ctx, query, serviceName)
 	if err != nil {
 		return fmt.Errorf("TableServices.Delete failed on DELETE: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersRoles) Add(ctx context.Context, database Querier,
+func (s implTableUsersRoles) Add(ctx context.Context, querier database.Querier,
 	userRole *AddUserRole) (*UserRole, error,
 ) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	if userRole == nil {
-		return nil, ErrNilArgument
+		return nil, database.ErrNilArgument
 	}
 
 	query := `
@@ -286,15 +286,15 @@ RETURNING
 
 	var dst UserRole
 
-	queryResult := database.QueryRow(ctx, query, userRole.UserID, userRole.UserRole, userRole.ServiceName)
+	queryResult := querier.QueryRow(ctx, query, userRole.UserID, userRole.UserRole, userRole.ServiceName)
 	err := queryResult.Scan(&dst.ID, &dst.UserID, &dst.UserRole, &dst.ServiceName, &dst.CreatedTS)
 
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return nil, ErrUniqueKeyViolation
+		return nil, database.ErrUniqueKeyViolation
 	}
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRows
+		return nil, database.ErrNoRows
 	}
 
 	if err != nil {
@@ -305,13 +305,13 @@ RETURNING
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersRoles) Insert(ctx context.Context, database Querier, userRole *UserRole) error {
-	if database == nil {
-		return ErrDBNotInitilized
+func (s implTableUsersRoles) Insert(ctx context.Context, querier database.Querier, userRole *UserRole) error {
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	if userRole == nil {
-		return ErrNilArgument
+		return database.ErrNilArgument
 	}
 
 	query := `
@@ -325,10 +325,10 @@ VALUES
   ($1, $2, $3, $4, $5)
 	`
 
-	_, err := database.Exec(ctx, query, userRole.ID, userRole.UserID, userRole.UserRole,
+	_, err := querier.Exec(ctx, query, userRole.ID, userRole.UserID, userRole.UserRole,
 		userRole.ServiceName, userRole.CreatedTS)
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return ErrUniqueKeyViolation
+		return database.ErrUniqueKeyViolation
 	}
 
 	if err != nil {
@@ -339,15 +339,14 @@ VALUES
 }
 
 // TODO: check if the user_role is adequate.
-func (s implTableUsersRoles) UpdateByID(ctx context.Context, database Querier, userRole *UserRole,
+func (s implTableUsersRoles) UpdateByID(ctx context.Context, querier database.Querier, userRole *UserRole,
 	dbEntryID uint) error {
-
-	if database == nil {
-		return ErrDBNotInitilized
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	if userRole == nil {
-		return ErrNilArgument
+		return database.ErrNilArgument
 	}
 
 	query := `
@@ -361,10 +360,10 @@ SET
 WHERE "id" = $6
 	`
 
-	result, err := database.Exec(ctx, query, userRole.ID, userRole.UserID, userRole.UserRole,
+	result, err := querier.Exec(ctx, query, userRole.ID, userRole.UserID, userRole.UserRole,
 		userRole.ServiceName, userRole.CreatedTS, dbEntryID)
 	if err != nil && strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return ErrUniqueKeyViolation
+		return database.ErrUniqueKeyViolation
 	}
 
 	if err != nil {
@@ -372,17 +371,17 @@ WHERE "id" = $6
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
 }
 
-func (s implTableUsersRoles) GetByUserID(ctx context.Context, database Querier,
+func (s implTableUsersRoles) GetByUserID(ctx context.Context, querier database.Querier,
 	userID string) ([]UserRole, error,
 ) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -401,7 +400,7 @@ WHERE "user_id" = $1
 		err error
 	)
 
-	queryResult, err := database.Query(ctx, query, userID)
+	queryResult, err := querier.Query(ctx, query, userID)
 	if err != nil {
 		return nil, fmt.Errorf("TableUsersGroups.GetByUserID failed on SELECT: %w", err)
 	}
@@ -419,9 +418,9 @@ WHERE "user_id" = $1
 	return dst, nil
 }
 
-func (s implTableUsersRoles) GetByID(ctx context.Context, database Querier, dbEntryID uint) (*UserRole, error) {
-	if database == nil {
-		return nil, ErrDBNotInitilized
+func (s implTableUsersRoles) GetByID(ctx context.Context, querier database.Querier, dbEntryID uint) (*UserRole, error) {
+	if querier == nil {
+		return nil, database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -437,11 +436,11 @@ WHERE "id" = $1
 
 	var dst UserRole
 
-	queryResult := database.QueryRow(ctx, query, dbEntryID)
+	queryResult := querier.QueryRow(ctx, query, dbEntryID)
 	err := queryResult.Scan(&dst.ID, &dst.UserID, &dst.UserRole, &dst.ServiceName, &dst.CreatedTS)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNoRows
+		return nil, database.ErrNoRows
 	}
 
 	if err != nil {
@@ -451,9 +450,9 @@ WHERE "id" = $1
 	return &dst, nil
 }
 
-func (s implTableUsersRoles) DeleteByID(ctx context.Context, database Querier, dbEntryID uint) error {
-	if database == nil {
-		return ErrDBNotInitilized
+func (s implTableUsersRoles) DeleteByID(ctx context.Context, querier database.Querier, dbEntryID uint) error {
+	if querier == nil {
+		return database.ErrDBNotInitilized
 	}
 
 	query := `
@@ -461,13 +460,13 @@ DELETE FROM "users_roles"
 WHERE "id" = $1
 		`
 
-	result, err := database.Exec(ctx, query, dbEntryID)
+	result, err := querier.Exec(ctx, query, dbEntryID)
 	if err != nil {
 		return fmt.Errorf("TableUsersGroups.DeleteByID failed on DELETE: %w", err)
 	}
 
 	if result.RowsAffected() == 0 {
-		return ErrNoRows
+		return database.ErrNoRows
 	}
 
 	return nil
