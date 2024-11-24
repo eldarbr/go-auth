@@ -35,6 +35,8 @@ func NewRouter(common CommonHandlingModule, auth AuthHandlingModule,
 
 	handler := httprouter.New()
 
+	handler.HandleOPTIONS = false
+
 	handler.MethodNotAllowed = http.HandlerFunc(common.MethodNotAllowed)
 	handler.NotFound = http.HandlerFunc(common.NotFound)
 

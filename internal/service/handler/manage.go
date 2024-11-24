@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log"
@@ -19,6 +20,12 @@ type ManageHandl struct {
 	cache      CacheImpl
 	reqLimit   int
 }
+
+type ctxKey string
+
+const (
+	ctxKeyRequesterUsername ctxKey = "RequesterUsername"
+)
 
 func NewManageHandl(dbInstance *database.Database, jwtService *encrypt.JWTService,
 	cache CacheImpl, limit int) ManageHandl {
@@ -125,9 +132,9 @@ func (manage ManageHandl) MiddlewareAuthorizeAnyClaim(requestedClaims []encrypt.
 			return
 		}
 
-		request.Header.Set("X-Requester-Username", claims.Username)
+		nextCtx := context.WithValue(request.Context(), ctxKeyRequesterUsername, claims.Username)
 
-		next(respWriter, request, routerParams)
+		next(respWriter, request.WithContext(nextCtx), routerParams)
 	}
 }
 
@@ -140,9 +147,9 @@ func (manage ManageHandl) MiddlewareRateLimit(next httprouter.Handle) httprouter
 			return
 		}
 
-		username := request.Header.Get("X-Requester-Username")
+		username, usernameOk := request.Context().Value(ctxKeyRequesterUsername).(string)
 
-		if username != "" {
+		if usernameOk && username != "" {
 			lookups := manage.cache.GetAndIncrease("usr:" + username)
 			if lookups > manage.reqLimit {
 				writeJSONResponse(respWriter, model.ErrorResponse{Error: "rate limited"}, http.StatusTooManyRequests)
