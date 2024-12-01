@@ -9,6 +9,7 @@ import (
 
 var (
 	ErrNoKey = errors.New("no item with the specified key")
+	ErrCast  = errors.New("internal error - list item cast failed")
 )
 
 type Cache struct {
@@ -47,7 +48,14 @@ func (cache *Cache) Peek(key string) (int, error) {
 
 	listItem, keyOk := cache.items[key]
 	if keyOk {
-		item = *listItem.Value.(*cacheItem)
+		itemPtr, castOk := listItem.Value.(*cacheItem)
+		if !castOk {
+			cache.mu.RUnlock()
+
+			return item.value, ErrCast
+		}
+
+		item = *itemPtr
 	}
 
 	cache.mu.RUnlock()
@@ -76,7 +84,15 @@ func (cache *Cache) Get(key string) (int, error) {
 
 	listItem, keyOk := cache.items[key]
 	if keyOk {
-		item = *listItem.Value.(*cacheItem)
+		itemPtr, castOk := listItem.Value.(*cacheItem)
+		if !castOk {
+			cache.mu.Unlock()
+
+			return item.value, ErrCast
+		}
+
+		item = *itemPtr
+
 		cache.lru.MoveToBack(listItem)
 	}
 
@@ -113,18 +129,35 @@ func (cache *Cache) Set(key string, value int) {
 	cache.mu.Unlock()
 }
 
+// concurrent-UNSAFE.
 func (cache *Cache) set(newItem cacheItem) {
+	var (
+		frontPtr       *cacheItem
+		frontPtrCastOk bool
+	)
+
 	for cache.lru.Len() > cache.capacity {
-		front := cache.lru.Front()
-		delete(cache.items, front.Value.(*cacheItem).key)
-		cache.lru.Remove(front)
+		frontList := cache.lru.Front()
+		if frontList == nil {
+			return
+		} else if frontPtr, frontPtrCastOk = frontList.Value.(*cacheItem); !frontPtrCastOk {
+			return
+		}
+
+		delete(cache.items, frontPtr.key)
+		cache.lru.Remove(frontList)
 	}
 
 	newItem.expires = time.Now().Unix() + cache.ttl
 
 	if cache.items[newItem.key] != nil {
-		cache.items[newItem.key].Value.(*cacheItem).value = newItem.value
-		cache.items[newItem.key].Value.(*cacheItem).expires = newItem.expires
+		itemPtr, itemPtrCastOk := cache.items[newItem.key].Value.(*cacheItem)
+		if !itemPtrCastOk {
+			return
+		}
+
+		itemPtr.value = newItem.value
+		itemPtr.expires = newItem.expires
 		cache.lru.MoveToBack(cache.items[newItem.key])
 	} else {
 		cache.items[newItem.key] = cache.lru.PushBack(&newItem)
@@ -138,15 +171,27 @@ func (cache *Cache) GetAndIncrease(key string) int {
 		key:   key,
 	}
 
+	var currentItemPtr *cacheItem
+
 	cache.mu.Lock()
 
 	listItem, keyOk := cache.items[key]
+	if keyOk {
+		itemPtr, itemPtrCastOk := listItem.Value.(*cacheItem)
+		if !itemPtrCastOk {
+			cache.mu.Unlock()
+
+			return newItem.value
+		}
+
+		currentItemPtr = itemPtr
+	}
 
 	// set value (1) if there was no such key, or if the entry has expired.
-	if keyOk && listItem.Value.(*cacheItem).expires > time.Now().Unix() {
-		newItem = *listItem.Value.(*cacheItem)
-		listItem.Value.(*cacheItem).value++
-		listItem.Value.(*cacheItem).expires = time.Now().Unix() + cache.ttl
+	if keyOk && currentItemPtr != nil && currentItemPtr.expires > time.Now().Unix() {
+		newItem = *currentItemPtr
+		currentItemPtr.value++
+		currentItemPtr.expires = time.Now().Unix() + cache.ttl
 		cache.lru.MoveToBack(listItem)
 	} else {
 		cache.set(newItem)
@@ -172,26 +217,33 @@ func (cache *Cache) AutoEvict(period time.Duration) {
 	for {
 		select {
 		case <-ticker.C:
-			cache.doAutoEvict()
+			cache.DoAutoEvict()
 		case <-cache.stopChan:
 			return
 		}
 	}
 }
 
-func (cache *Cache) doAutoEvict() {
+func (cache *Cache) DoAutoEvict() {
 	cache.mu.Lock()
 
 	listItem := cache.lru.Front()
 
 	for listItem != nil {
-		if listItem.Value.(*cacheItem).expires > time.Now().Unix() {
+		item, itemCastOk := listItem.Value.(*cacheItem)
+		if !itemCastOk {
+			cache.mu.Unlock()
+
+			return
+		}
+
+		if item.expires > time.Now().Unix() {
 			break
 		}
 
 		nextItem := listItem.Next()
 
-		delete(cache.items, listItem.Value.(*cacheItem).key)
+		delete(cache.items, item.key)
 		cache.lru.Remove(listItem)
 
 		listItem = nextItem

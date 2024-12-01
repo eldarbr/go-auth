@@ -5,6 +5,7 @@ import (
 	"github.com/eldarbr/go-auth/internal/service/encrypt"
 )
 
+// PrepareClaims converts database model user roles to jwt claims.
 func PrepareClaims(dbRoles []storage.UserRole) []encrypt.ClaimUserRole {
 	if len(dbRoles) == 0 {
 		return nil

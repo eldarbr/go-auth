@@ -66,26 +66,28 @@ func NewJWTService(privatePath, publicPath string, tokenTTL time.Duration) (*JWT
 	}, nil
 }
 
-func (jwtService *JWTService) IssueToken(claims AuthCustomClaims) (string, error) {
+func (jwtService *JWTService) IssueToken(claims AuthCustomClaims) (string, *time.Time, error) {
 	if jwtService == nil {
-		return "", myerrors.ErrServiceNullPtr
+		return "", nil, myerrors.ErrServiceNullPtr
 	}
+
+	newTokenExpires := jwt.TimeFunc().Add(jwtService.tokenTTL)
 
 	completeClaims := myCompletelaims{
 		AuthCustomClaims: claims,
 		StandardClaims: jwt.StandardClaims{ //nolint:exhaustruct // other fields are not used.
 			IssuedAt:  jwt.TimeFunc().Unix(),
-			ExpiresAt: jwt.TimeFunc().Add(jwtService.tokenTTL).Unix(),
+			ExpiresAt: newTokenExpires.Unix(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodRS512, completeClaims)
 
 	signedToken, err := token.SignedString(jwtService.privateKey)
 	if err != nil {
-		return "", fmt.Errorf("jwtService.IssueToken signing failed: %w", err)
+		return "", nil, fmt.Errorf("jwtService.IssueToken signing failed: %w", err)
 	}
 
-	return signedToken, nil
+	return signedToken, &newTokenExpires, nil
 }
 
 func (jwtService *JWTService) ValidateToken(tokenString string) (*AuthCustomClaims, error) {

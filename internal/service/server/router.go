@@ -17,6 +17,7 @@ type CommonHandlingModule interface {
 
 type AuthHandlingModule interface {
 	Authenticate(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
+	InitSession(w http.ResponseWriter, r *http.Request, _ httprouter.Params)
 }
 
 type ManageHandlingModule interface {
@@ -41,6 +42,7 @@ func NewRouter(common CommonHandlingModule, auth AuthHandlingModule,
 	handler.NotFound = http.HandlerFunc(common.NotFound)
 
 	handler.POST("/auth/authenticate", auth.Authenticate)
+	handler.POST("/auth/initsession", auth.InitSession)
 
 	handler.POST("/manage/users", ratelimiter.MiddlewareIPRateLimit(manage.MiddlewareAuthorizeAnyClaim(
 		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: storage.UserRoleTypeRoot}},
