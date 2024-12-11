@@ -40,6 +40,9 @@ func (authHandl AuthHandl) Authenticate(respWriter http.ResponseWriter,
 	log.Printf("request Authenticate received")
 
 	token, _ := authHandl.getToken(respWriter, request, params)
+	if token == "" {
+		return
+	}
 
 	// Prepare the response body.
 	resp := model.UserTokenResponse{
@@ -54,20 +57,21 @@ func (authHandl AuthHandl) InitSession(respWriter http.ResponseWriter,
 	log.Printf("request InitSession received")
 
 	token, expires := authHandl.getToken(respWriter, request, params)
-
-	if token != "" {
-		responseCookie := http.Cookie{
-			Name:     "tokenid",
-			Value:    token,
-			Domain:   authHandl.sessionDomain,
-			Secure:   true,
-			HttpOnly: true,
-			Expires:  *expires,
-			Path:     "/",
-		}
-
-		http.SetCookie(respWriter, &responseCookie)
+	if token == "" {
+		return
 	}
+
+	responseCookie := http.Cookie{
+		Name:     "tokenid",
+		Value:    token,
+		Domain:   authHandl.sessionDomain,
+		Secure:   true,
+		HttpOnly: true,
+		Expires:  *expires,
+		Path:     "/",
+	}
+
+	http.SetCookie(respWriter, &responseCookie)
 
 	writeJSONResponse(respWriter, model.ErrorResponse{Error: ""}, http.StatusOK)
 }
