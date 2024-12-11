@@ -41,13 +41,17 @@ func NewRouter(common CommonHandlingModule, auth AuthHandlingModule,
 	handler.MethodNotAllowed = http.HandlerFunc(common.MethodNotAllowed)
 	handler.NotFound = http.HandlerFunc(common.NotFound)
 
+	// authenticate
 	handler.POST("/auth/authenticate", auth.Authenticate)
 	handler.POST("/auth/initsession", auth.InitSession)
 
+	// create a user.
 	handler.POST("/manage/users", ratelimiter.MiddlewareIPRateLimit(manage.MiddlewareAuthorizeAnyClaim(
 		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: storage.UserRoleTypeRoot}},
 		manage.MiddlewareRateLimit(manage.CreateUser),
 	)))
+
+	// get a user.
 	handler.GET("/manage/users", ratelimiter.MiddlewareIPRateLimit(manage.MiddlewareAuthorizeAnyClaim(
 		[]encrypt.ClaimUserRole{{ServiceName: myOwnServiceName, UserRole: storage.UserRoleTypeRoot}},
 		manage.MiddlewareRateLimit(manage.GetUserInfo),
